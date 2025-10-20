@@ -1,0 +1,330 @@
+/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.1.bn2.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+INFO:timm.models._builder:Missing keys (fc.weight, fc.bias) discovered while loading pretrained weights. This is expected if model is being adapted.
+Some weights of the model checkpoint at microsoft/table-transformer-detection were not used when initializing TableTransformerForObjectDetection: ['model.backbone.conv_encoder.model.layer2.0.downsample.1.num_batches_tracked', 'model.backbone.conv_encoder.model.layer3.0.downsample.1.num_batches_tracked', 'model.backbone.conv_encoder.model.layer4.0.downsample.1.num_batches_tracked']
+- This IS expected if you are initializing TableTransformerForObjectDetection from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).
+- This IS NOT expected if you are initializing TableTransformerForObjectDetection from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).
+2025-10-15 23:48:45 | INFO | app.new_extraction_services.models.advanced_tableformer:_load_detection_model:44 | Table detection model loaded successfully
+2025-10-15 23:48:46 | INFO | app.new_extraction_services.models.advanced_tableformer:_load_structure_model:76 | Table structure model loaded successfully
+2025-10-15 23:48:46 | INFO | app.new_extraction_services.pipeline.extraction_pipeline:_initialize_components:114 | Advanced TableFormer initialized
+WARNING:easyocr.easyocr:Using CPU. Note: This module is much faster with a GPU.
+2025-10-15 23:48:49 | INFO | app.new_extraction_services.models.tableformer:_init_easyocr:409 | EasyOCR initialized successfully
+WARNING:easyocr.easyocr:Using CPU. Note: This module is much faster with a GPU.
+2025-10-15 23:48:54 | INFO | app.new_extraction_services.models.advanced_ocr_engine:_init_ocr_engines:60 | EasyOCR engine initialized
+2025-10-15 23:48:55 | INFO | app.new_extraction_services.models.advanced_ocr_engine:_init_ocr_engines:72 | Tesseract OCR engine initialized
+2025-10-15 23:48:55 | INFO | app.new_extraction_services.models.advanced_ocr_engine:_init_ocr_engines:94 | Initialized 2 OCR engines to prevent OMP conflicts
+2025-10-15 23:48:55 | INFO | app.new_extraction_services.pipeline.extraction_pipeline:_initialize_components:133 | Advanced OCR engine initialized
+2025-10-15 23:48:55 | INFO | app.new_extraction_services.pipeline.extraction_pipeline:_initialize_components:141 | Pipeline components initialized successfully
+INFO:timm.models._builder:Loading pretrained weights from Hugging Face hub (timm/resnet18.a1_in1k)
+INFO:timm.models._hub:[timm/resnet18.a1_in1k] Safe alternative available for 'pytorch_model.bin' (as 'model.safetensors'). Loading weights using safetensors.
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for conv1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for bn1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for bn1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.0.conv1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.0.bn1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.0.bn1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.0.conv2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.0.bn2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.0.bn2.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.1.conv1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.1.bn1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.1.bn1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.1.conv2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.1.bn2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer1.1.bn2.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.0.conv1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.0.bn1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.0.bn1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.0.conv2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.0.bn2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.0.bn2.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.0.downsample.0.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.0.downsample.1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.0.downsample.1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.1.conv1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.1.bn1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.1.bn1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.1.conv2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.1.bn2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer2.1.bn2.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.0.conv1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.0.bn1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.0.bn1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.0.conv2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.0.bn2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.0.bn2.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.0.downsample.0.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.0.downsample.1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.0.downsample.1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.1.conv1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.1.bn1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.1.bn1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.1.conv2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.1.bn2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer3.1.bn2.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.0.conv1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.0.bn1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.0.bn1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.0.conv2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.0.bn2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.0.bn2.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.0.downsample.0.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.0.downsample.1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.0.downsample.1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.1.conv1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.1.bn1.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.1.bn1.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.1.conv2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.1.bn2.weight: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+/Users/kayttaja/Desktop/commision-tracker/server/venv/lib/python3.11/site-packages/torch/nn/modules/module.py:2025: UserWarning: for layer4.1.bn2.bias: copying from a non-meta parameter in the checkpoint to a meta parameter in the current model, which is a no-op. (Did you mean to pass `assign=True` to assign items in the state dictionary to their corresponding key in the module instead of copying them in place?)
+  warnings.warn(f'for {key}: copying from a non-meta parameter in the checkpoint to a meta '
+INFO:timm.models._builder:Missing keys (fc.weight, fc.bias) discovered while loading pretrained weights. This is expected if model is being adapted.
+Some weights of the model checkpoint at microsoft/table-transformer-detection were not used when initializing TableTransformerForObjectDetection: ['model.backbone.conv_encoder.model.layer2.0.downsample.1.num_batches_tracked', 'model.backbone.conv_encoder.model.layer3.0.downsample.1.num_batches_tracked', 'model.backbone.conv_encoder.model.layer4.0.downsample.1.num_batches_tracked']
+- This IS expected if you are initializing TableTransformerForObjectDetection from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).
+- This IS NOT expected if you are initializing TableTransformerForObjectDetection from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).
+2025-10-15 23:48:56 | INFO | app.new_extraction_services.models.advanced_tableformer:_load_detection_model:44 | Table detection model loaded successfully
+2025-10-15 23:48:57 | INFO | app.new_extraction_services.models.advanced_tableformer:_load_structure_model:76 | Table structure model loaded successfully
+WARNING:easyocr.easyocr:Using CPU. Note: This module is much faster with a GPU.
+2025-10-15 23:49:01 | INFO | app.new_extraction_services.models.advanced_ocr_engine:_init_ocr_engines:60 | EasyOCR engine initialized
+2025-10-15 23:49:01 | INFO | app.new_extraction_services.models.advanced_ocr_engine:_init_ocr_engines:72 | Tesseract OCR engine initialized
+2025-10-15 23:49:01 | INFO | app.new_extraction_services.models.advanced_ocr_engine:_init_ocr_engines:94 | Initialized 2 OCR engines to prevent OMP conflicts
+INFO:app.services.company_name_service:spaCy not available, using pattern matching only
+2025-10-15 23:49:01 | INFO | app.services.new_extraction_service:__init__:57 | New Extraction Service initialized successfully
+INFO:app.services.company_name_service:spaCy not available, using pattern matching only
+✅ Set GOOGLE_DOCAI_PROCESSOR_ID to: 521303e404fb7809
+✅ Google Document AI initialized - Project: pdf-tables-extractor-465009, Processor: 521303e404fb7809
+INFO:app.services.enhanced_extraction_service:✅ Enhanced Extraction Service initialized
+INFO:app.services.enhanced_extraction_service:🆕 PRIMARY: Claude Document AI (extraction) + GPT-4 (AI operations)
+INFO:app.services.enhanced_extraction_service:📋 FALLBACK: Mistral Document AI
+INFO:app.services.enhanced_extraction_service:⏱️  Timeout management: {'metadata_extraction': 300, 'document_processing': 600, 'table_extraction': 1200, 'post_processing': 300, 'total_process': 1800}
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: STEP_STARTED
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Step started: Processing Table Data (Step 3) for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.enhanced_extraction_service:✅ MISTRAL service validated successfully
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Started stage document_processing for upload upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Completed stage document_processing for upload upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.enhanced_extraction_service:Starting GPT metadata extraction with 300s timeout
+INFO:app.services.enhanced_extraction_service:Extracting metadata with GPT from first page of pdfs/08.06.2025 Allied Innovative Payment 2.pdf
+INFO:app.services.enhanced_extraction_service:Converted first page to image (586064 chars)
+INFO:app.services.enhanced_extraction_service:Calling GPT-4 Vision API for metadata extraction
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:app.services.enhanced_extraction_service:GPT-4 response: ```json
+{
+  "carrier_name": "ALLIED",
+  "carrier_confidence": 0.95,
+  "statement_date": "8/6/2025",
+  "date_confidence": 0.90,
+  "evidence": "Carrier name found in the logo at the top left. Statement date found under 'Report Date' on the right side."
+}
+```
+INFO:app.services.extraction_utils:Date normalized: '8/6/2025' -> '2025-08-06'
+INFO:app.services.enhanced_extraction_service:GPT metadata extraction successful: {'success': True, 'carrier_name': 'ALLIED', 'carrier_confidence': 0.95, 'statement_date': '2025-08-06', 'date_confidence': 0.9, 'evidence': "Carrier name found in the logo at the top left. Statement date found under 'Report Date' on the right side.", 'extraction_method': 'gpt4o_vision_first_page'}
+INFO:app.services.enhanced_extraction_service:GPT extracted: carrier=ALLIED, date=2025-08-06
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Started stage table_detection for upload upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.enhanced_extraction_service:Starting Mistral extraction with 1200s timeout
+INFO:app.services.mistral.service:Starting intelligent extraction for: pdfs/08.06.2025 Allied Innovative Payment 2.pdf
+INFO:app.services.mistral.service:Adaptive timeout for 7 pages: 300s
+INFO:app.services.mistral.service:Using adaptive timeout: 300s for document processing
+INFO:app.services.mistral.service:🔍 Using Mistral OCR endpoint for table extraction
+INFO:app.services.mistral.service:🔍 Extracting tables via Mistral OCR (model: mistral-ocr-latest)
+INFO:httpx:HTTP Request: POST https://api.mistral.ai/v1/ocr "HTTP/1.1 200 OK"
+INFO:app.services.mistral.service:Page 1: Found 1 tables
+INFO:app.services.mistral.service:Page 2: Found 1 tables
+INFO:app.services.mistral.service:Page 3: Found 1 tables
+INFO:app.services.mistral.service:Page 4: Found 1 tables
+INFO:app.services.mistral.service:Page 5: Found 1 tables
+INFO:app.services.mistral.service:Page 6: Found 1 tables
+INFO:app.services.mistral.service:Page 7: Found 1 tables
+INFO:app.services.mistral.service:✅ OCR extraction successful: 7 tables found
+INFO:app.services.mistral.service:✅ OCR extraction completed in 2.06s with 7 tables
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.api.websocket:Received unknown message type: heartbeat
+📎 Enhanced multi-strategy stitching: Processing 7 tables
+📎 Canonical header identified: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount'] (10 columns)
+📎 Table 1 headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount'] (10 columns)
+📎 Table 2 headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount'] (10 columns)
+📎 Table 3 headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount'] (10 columns)
+📎 Table 4 headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount'] (10 columns)
+📎 Table 5 headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount'] (10 columns)
+📎 Table 6 headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount'] (10 columns)
+📎 Table 7 headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount'] (10 columns)
+📎 Found 1 unique header patterns
+📎 Header pattern 'group no.' appears in 7 tables
+📎 Creating group with 7 tables (identical headers)
+📎 Grouped 7 tables into 1 groups
+📎 Merging group 1 with 7 tables
+INFO:app.services.mistral.service:✅ Mistral client initialized successfully
+INFO:app.services.mistral.service:   Model: mistral-ocr-latest (Mistral OCR for Document AI)
+INFO:app.services.mistral.service:   API Key: ****************************xGt2
+INFO:app.services.mistral.service:Enhanced Mistral service initialized with summary detection and performance optimization
+INFO:app.services.mistral.service:Applying enhancements to table with 92 rows
+INFO:app.services.mistral.service:Phase 1: Applying professional bracket processing...
+INFO:app.services.mistral.enhancement_config:Bracket processing recorded: 195 brackets converted
+INFO:app.services.mistral.service:✓ Bracket processing: 195 values converted (21.4% conversion rate)
+INFO:app.services.mistral.service:Phase 2: Applying multi-strategy summary detection...
+INFO:app.services.mistral.enhancement_config:Summary detection recorded: 29 rows removed, confidence: 0.82
+INFO:app.services.mistral.service:✓ Summary detection: Removed 29 rows with 81.99% confidence
+INFO:app.services.mistral.service:  Detection method: multi_strategy_conservative
+INFO:app.services.mistral.service:  Strategies used: ['semantic', 'density', 'position', 'business_logic']
+INFO:app.services.mistral.enhancement_config:Performance recorded: 0.05s (avg: 0.05s)
+INFO:app.services.mistral.service:✓ Table enhancements completed in 0.05s
+INFO:app.services.extraction_utils:✅ Re-applied enhancements to merged table: 92 rows
+📎 Merged table 1: 10 headers, 63 rows
+📎 Merged headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount']
+📎 Enhanced stitching completed: 1 final tables
+INFO:app.services.extraction_utils:Header normalization: 10 headers normalized
+INFO:app.services.enhanced_extraction_service:Normalized headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount'] -> ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount']
+INFO:app.services.enhanced_extraction_service:Mistral: Merged 7 tables into 1 tables with header normalization
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Completed stage table_detection for upload upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Started stage validation for upload upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: progress_update
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: completion
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Completed processing for upload upload_1760561314695_lf0t5xqrv in 11.02 seconds
+INFO:app.services.audit_logging_service:Audit: data_view by user f6cf1764-5bfc-4352-abd9-81b72b7cf191 on extraction_complete (ID: f6462614-6841-4433-8f51-f09f26c3b787)
+INFO:app.api.new_extract:🎯 Format Learning: Using carrier ALLIED with ID 6890e41e-e373-4d33-bf87-41888b5a1263
+WARNING:app.api.new_extract:🚨 CARRIER MISMATCH DETECTED: File uploaded to 68b19b72-b540-4bdb-a80f-44c8bc527025 but extracted as ALLIED (6890e41e-e373-4d33-bf87-41888b5a1263)
+INFO:app.api.new_extract:🔄 Reassigning file to correct carrier: ALLIED
+INFO:app.services.gcs_utils:✅ File copied in GCS: statements/f6462614-6841-4433-8f51-f09f26c3b787/08.06.2025 Allied Innovative Payment 2.pdf -> statements/6890e41e-e373-4d33-bf87-41888b5a1263/08.06.2025 Allied Innovative Payment 2.pdf
+INFO:app.services.gcs_utils:✅ File deleted from GCS: statements/f6462614-6841-4433-8f51-f09f26c3b787/08.06.2025 Allied Innovative Payment 2.pdf
+INFO:app.services.gcs_utils:✅ Generated signed URL for GCS file with inline headers: statements/6890e41e-e373-4d33-bf87-41888b5a1263/08.06.2025 Allied Innovative Payment 2.pdf
+INFO:app.api.new_extract:✅ File moved to correct carrier folder in GCS: statements/6890e41e-e373-4d33-bf87-41888b5a1263/08.06.2025 Allied Innovative Payment 2.pdf
+INFO:app.api.new_extract:📊 Single table detected, using it for field mapping
+INFO:app.api.new_extract:🎯 Using table 0 for field mapping with 10 headers
+🎯 FormatLearningService: Finding matching format for company 6890e41e-e373-4d33-bf87-41888b5a1263
+🎯 FormatLearningService: Headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount']
+🎯 FormatLearningService: Table structure: {'row_count': 63, 'column_count': 10, 'has_financial_data': True}
+🎯 FormatLearningService: Headers type: <class 'list'>
+🎯 FormatLearningService: Headers length: 10
+🎯 CRUD: Finding best matching format for company 6890e41e-e373-4d33-bf87-41888b5a1263
+🎯 CRUD: Input headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount']
+🎯 CRUD: Input table structure: {'row_count': 63, 'column_count': 10, 'has_financial_data': True}
+🎯 CRUD: Found 3 saved formats for company
+🎯 CRUD: Comparing with saved format:
+🎯 CRUD:   Saved headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent Rate', 'Calculation Method', 'Census Ct.', 'Paid Amount']
+🎯 CRUD:   Header similarity: 0.8
+🎯 CRUD:   Structure similarity: 1.0
+🎯 CRUD:   Total score: 0.8400000000000001
+🎯 CRUD:   -> New best match with score 0.8400000000000001
+🎯 CRUD: Comparing with saved format:
+🎯 CRUD:   Saved headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Stoploss Total', 'Agent %', 'Calculation Method', 'Census Ct.', 'Paid Amount']
+🎯 CRUD:   Header similarity: 0.7200000000000001
+🎯 CRUD:   Structure similarity: 1.0
+🎯 CRUD:   Total score: 0.776
+🎯 CRUD: Comparing with saved format:
+🎯 CRUD:   Saved headers: ['Group No.', 'Group Name', 'Billing Period', 'Adj. Period', 'Invoice Total', 'Census Ct.', 'Calculation Method', 'Agent Rate', 'Paid Amount']
+🎯 CRUD:   Header similarity: 0.7200000000000001
+🎯 CRUD:   Structure similarity: 1.0
+🎯 CRUD:   Total score: 0.776
+🎯 FormatLearningService: Best match score: 0.8400000000000001
+🎯 FormatLearningService: Found matching format with signature: 6f736ac611e1789c131a993b10321314
+🎯 FormatLearningService: Learned field mapping: {'Group No.': 'Policy Number', 'Agent Rate': 'Commission Rate', 'Census Ct.': 'Total Subscribers', 'Group Name': 'Client Name', 'Adj. Period': 'Adjustment Period Start', 'Paid Amount': 'Total Commission Paid', 'Invoice Total': 'Invoice Total', 'Billing Period': 'Coverage Period Start', 'Stoploss Total': 'Stoploss Total', 'Calculation Method': 'Plan Type'}
+🎯 FormatLearningService: Learned table editor settings: {}
+INFO:app.api.new_extract:🎯 Format Learning: Found matching format with score 0.8400000000000001
+INFO:app.services.ai_plan_type_detection_service:AI Plan Type Detection Service initialized successfully
+INFO:app.api.new_extract:🔍 AI Plan Type Detection: Detecting plan types during extraction
+INFO:app.services.ai_plan_type_detection_service:🔍 AI Plan Detection: Analyzing document for insurance plan types
+INFO:httpx:HTTP Request: POST https://api.mistral.ai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:app.services.ai_plan_type_detection_service:✅ AI successfully detected plan types
+INFO:app.services.ai_plan_type_detection_service:✅ AI Plan Detection: Found 1 plan types with 0.90 confidence
+INFO:app.api.new_extract:✅ AI Plan Detection: 1 plan types with 0.90 confidence
+INFO:app.api.new_extract:⏭️  AI field mapping will be triggered after table review and editing
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: STEP_STARTED
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Step started: Finalizing (Step 6) for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.user_profile_service:Recorded contribution: upload for user f6cf1764-5bfc-4352-abd9-81b72b7cf191
+INFO:app.services.audit_logging_service:Audit: file_upload by user f6cf1764-5bfc-4352-abd9-81b72b7cf191 on statement_upload (ID: f6462614-6841-4433-8f51-f09f26c3b787)
+INFO:app.services.websocket_service:Broadcasting message to upload_id upload_1760561314695_lf0t5xqrv: EXTRACTION_COMPLETE
+INFO:app.services.websocket_service:Found 1 connections for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.services.websocket_service:Extraction complete for upload_id upload_1760561314695_lf0t5xqrv
+INFO:app.api.new_extract:✅ Extraction complete! Sent results via WebSocket for upload_id: upload_1760561314695_lf0t5xqrv
+INFO:     127.0.0.1:64690 - "POST /api/extract-tables-smart/ HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:app.api.websocket:WebSocket disconnected: upload_id=upload_1760561314695_lf0t5xqrv, session_id=session_1760561314706_atea8ao77
+INFO:app.services.websocket_service:WebSocket disconnected: upload_id=upload_1760561314695_lf0t5xqrv, session_id=session_1760561314706_atea8ao77
+INFO:app.api.websocket:WebSocket cleanup completed for upload_id=upload_1760561314695_lf0t5xqrv
+INFO:app.api.pdf_proxy:🔄 Proxying PDF from: https://storage.googleapis.com/pdf_extraction_files_saver/statements/6890e41e-e373-4d33-bf87-41888b5...
+INFO:httpx:HTTP Request: GET https://storage.googleapis.com/pdf_extraction_files_saver/statements/6890e41e-e373-4d33-bf87-41888b5a1263/08.06.2025%20Allied%20Innovative%20Payment%202.pdf?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=docsai-table-extractor%40pdf-tables-extractor-465009.iam.gserviceaccount.com%2F20251015%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20251015T204916Z&X-Goog-Expires=3599&X-Goog-SignedHeaders=host&response-content-disposition=inline&response-content-type=application%2Fpdf&X-Goog-Signature=9c75971ff6121605cf4a1668ddaa1e1a9130bdd9c330214bdf1e4091c173da73aa7743e9a269cc6ab0752defea5b2cd0b1279f142491a707ab206f87bb0f5cb736ac5193356ceef8de13b0791a6c4f6fe7fce71546bafe9d61e10453df715143fc3de2fc6aae95a3868b2d891aa3a44c2f2eacdf36af8e5cad09e4a7d524783ce3d5cdb27b4f2a13d4e1bdd8e39c0043efcdad269042721e6326e113a3d7784b71c83cc60cf15c1b9707f19bb9fa98c1d3a7ea6d831fdff431782f323c364411d27878f9ae60b75ed4c8b5f8cd91c5425ba9b8795cc9d5c86d32d24ad43d49916497973653c4b3288a6d0feeed7b4d9c3645719872fe163851d0e08c7350ab80 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:64926 - "GET /api/pdf-proxy?url=https%3A%2F%2Fstorage.googleapis.com%2Fpdf_extraction_files_saver%2Fstatements%2F6890e41e-e373-4d33-bf87-41888b5a1263%2F08.06.2025%2520Allied%2520Innovative%2520Payment%25202.pdf%3FX-Goog-Algorithm%3DGOOG4-RSA-SHA256%26X-Goog-Credential%3Ddocsai-table-extractor%2540pdf-tables-extractor-465009.iam.gserviceaccount.com%252F20251015%252Fauto%252Fstorage%252Fgoog4_request%26X-Goog-Date%3D20251015T204916Z%26X-Goog-Expires%3D3599%26X-Goog-SignedHeaders%3Dhost%26response-content-disposition%3Dinline%26response-content-type%3Dapplication%252Fpdf%26X-Goog-Signature%3D9c75971ff6121605cf4a1668ddaa1e1a9130bdd9c330214bdf1e4091c173da73aa7743e9a269cc6ab0752defea5b2cd0b1279f142491a707ab206f87bb0f5cb736ac5193356ceef8de13b0791a6c4f6fe7fce71546bafe9d61e10453df715143fc3de2fc6aae95a3868b2d891aa3a44c2f2eacdf36af8e5cad09e4a7d524783ce3d5cdb27b4f2a13d4e1bdd8e39c0043efcdad269042721e6326e113a3d7784b71c83cc60cf15c1b9707f19bb9fa98c1d3a7ea6d831fdff431782f323c364411d27878f9ae60b75ed4c8b5f8cd91c5425ba9b8795cc9d5c86d32d24ad43d49916497973653c4b3288a6d0feeed7b4d9c3645719872fe163851d0e08c7350ab80 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64690 - "GET /api/pending/progress/f6462614-6841-4433-8f51-f09f26c3b787/table_editor HTTP/1.1" 200 OK

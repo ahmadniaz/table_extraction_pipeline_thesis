@@ -1,0 +1,29 @@
+# Client ignores
+client/node_modules/
+client/.next/
+client/.env
+
+# Server ignores
+server/venv/
+server/.env
+server/**/.env
+server/__pycache__/
+server/**/__pycache__/
+server/**/*.pyc
+
+# Model cache directories (large files, should be downloaded at runtime)
+server/model_cache/
+server/docling_models/
+
+# Large model files (handled by Git LFS or downloaded during deployment)
+server/docling_models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors
+server/docling_models/model_artifacts/tableformer/fast/tableformer_fast.safetensors
+*.safetensors
+
+# Google Cloud credentials (sensitive)
+server/pdf-tables-extractor-*.json
+# Don't exclude all JSON files, only credentials
+# *.json
+
+# General
+*.log

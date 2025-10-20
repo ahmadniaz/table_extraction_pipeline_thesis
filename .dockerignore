@@ -1,0 +1,68 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Documentation
+README.md
+*.md
+
+# Client directory (frontend)
+client/
+
+# Large model files and data
+docling_models/
+pdfs/
+*.pdf
+*.model
+*.pkl
+*.h5
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Render configuration
+render.yaml
+
+# Node modules (if any)
+node_modules/
+
+# Build artifacts
+dist/
+build/ 

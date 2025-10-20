@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: commission-tracker-backend
+    env: python
+    plan: pro
+    scaling:
+      minInstances: 1
+      maxInstances: 1
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r server/requirements.txt
+    startCommand: |
+      cd server && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 7200 --timeout-graceful-shutdown 300 --access-log --loop asyncio
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.13
+      - key: RENDER_DB_KEY
+        sync: false
+      - key: SUPABASE_DB_KEY
+        sync: false
+      - key: GCS_BUCKET_NAME
+        value: pdf_extraction_files_saver
+      - key: GOOGLE_CLOUD_PROJECT_ID
+        value: pdf-tables-extractor-465009
+      - key: GOOGLE_DOCAI_PROCESSOR_ID
+        value: "521303e404fb7809"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # New extraction service environment variables
+      - key: HF_HOME
+        value: "/tmp/model_cache/transformers"
+      - key: TRANSFORMERS_CACHE
+        value: "/tmp/model_cache/transformers"
+      - key: EASYOCR_MODULE_PATH
+        value: "/tmp/model_cache/easyocr"
+      - key: DOCLING_CACHE_DIR
+        value: "/tmp/model_cache/docling"
+      - key: UVICORN_TIMEOUT_KEEP_ALIVE
+        value: "7200"
+      - key: UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN
+        value: "300"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: MALLOC_ARENA_MAX
+        value: "2"

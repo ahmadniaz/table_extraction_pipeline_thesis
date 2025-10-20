@@ -1,0 +1,58 @@
+# New Extraction Service Configuration
+# This configuration file is used by the new advanced extraction pipeline
+
+environment: "production"
+debug: false
+
+models:
+  tableformer_path: "microsoft/table-transformer-structure-recognition-v1.1-all"
+  layout_model_path: "microsoft/layoutlmv3-base"
+  ocr_engine: "easyocr"
+  device: "cpu"
+  batch_size: 1
+  confidence_threshold: 0.7
+  cache_dir: "/tmp/model_cache"
+  enable_advanced_tableformer: true
+  enable_ensemble_ocr: true
+
+processing:
+  max_image_size: [2048, 2048]
+  confidence_threshold: 0.6
+  enable_multipage: true
+  output_format: "json"
+  enable_ocr: true
+  ocr_languages: ["en"]
+  table_detection_threshold: 0.6
+  cell_detection_threshold: 0.5
+  merge_threshold: 0.1
+  enable_financial_processing: true
+  enable_advanced_metrics: true
+  multipage_similarity_threshold: 0.8
+  # Adaptive learning settings
+  enable_adaptive_learning: true
+  pattern_matching_threshold: 0.6
+  content_similarity_threshold: 0.7
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  max_file_size: 52428800  # 50MB
+  allowed_extensions: [".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".docx"]
+  cors_origins: ["*"]
+
+logging:
+  level: "INFO"
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}"
+  rotation: "100 MB"
+  retention: "30 days"
+  log_file: "logs/new_extraction.log"
+
+# Extraction-specific settings
+extraction:
+  confidence_threshold: 0.6
+  enable_ocr: true
+  enable_multipage: true
+  max_tables_per_page: 10
+  enable_quality_checks: true
+  output_format: "json"

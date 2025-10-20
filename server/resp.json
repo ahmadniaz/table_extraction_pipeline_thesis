@@ -1,0 +1,1414 @@
+{
+    "success": true,
+    "upload_id": "f6462614-6841-4433-8f51-f09f26c3b787",
+    "tables": [
+        {
+            "headers": [
+                "Group No.",
+                "Group Name",
+                "Billing Period",
+                "Adj. Period",
+                "Invoice Total",
+                "Stoploss Total",
+                "Agent Rate",
+                "Calculation Method",
+                "Census Ct.",
+                "Paid Amount"
+            ],
+            "rows": [
+                [
+                    "L213059",
+                    "BOLT LOGISTIC",
+                    "8/1/2025",
+                    "7/1/2025",
+                    "-$627.27",
+                    "-$266.05",
+                    "22.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$141.14"
+                ],
+                [
+                    "",
+                    "ANAT GOLDSTEIN",
+                    "",
+                    "",
+                    ""
+                ],
+                [
+                    "L214135",
+                    "FUZION EXPRESS LL",
+                    "7/1/2025",
+                    "7/1/2025",
+                    "$4806.13",
+                    "$2145.69",
+                    "11.5\\%",
+                    "Premium Equivalent",
+                    "13",
+                    "-$552.73"
+                ],
+                [
+                    "L214135",
+                    "FUZION EXPRESS LL",
+                    "7/1/2025",
+                    "6/1/2025",
+                    "-$331.46",
+                    "-$147.98",
+                    "11.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "$38.12"
+                ],
+                [
+                    "",
+                    "ANAT GOLDSTEIN",
+                    "",
+                    "",
+                    ""
+                ],
+                [
+                    "L221281",
+                    "LUDICROUS SPEED LOGI",
+                    "8/1/2025",
+                    "7/1/2025",
+                    "$547.17",
+                    "$240.35",
+                    "18\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$159.51"
+                ],
+                [
+                    "L221281",
+                    "LUDICROUS SPEED LOGI",
+                    "8/1/2025",
+                    "8/1/2025",
+                    "$7173.86",
+                    "$3224.14",
+                    "18\\%",
+                    "Premium Equivalent",
+                    "2",
+                    "$122.04"
+                ],
+                [
+                    "L221281",
+                    "LUDICROUS SPEED LOGI",
+                    "8/1/2025",
+                    "8/1/2025",
+                    "$7173.86",
+                    "$3224.14",
+                    "18\\%",
+                    "Premium Equivalent",
+                    "4",
+                    "$244.08"
+                ],
+                [
+                    "L221281",
+                    "LUDICROUS SPEED LOGI",
+                    "8/1/2025",
+                    "8/1/2025",
+                    "$7173.86",
+                    "$3224.14",
+                    "18\\%",
+                    "Premium Equivalent",
+                    "13",
+                    "$925.23"
+                ],
+                [
+                    "L221281",
+                    "LUDICROUS SPEED LOGI",
+                    "8/1/2025",
+                    "7/1/2025",
+                    "$547.17",
+                    "$240.35",
+                    "18\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.02"
+                ],
+                [
+                    "L223023",
+                    "G \\& N LOGISTICS LL",
+                    "8/1/2025",
+                    "7/1/2025",
+                    "$443.10",
+                    "$197.09",
+                    "15.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$68.68"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "1/1/2025",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "6/1/2025",
+                    "$407.91",
+                    "$165.20",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "6/1/2025",
+                    "$407.91",
+                    "$165.20",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "2",
+                    "$132.52"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "8/1/2025",
+                    "$6338.06",
+                    "$2566.35",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$163.29"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "8/1/2025",
+                    "$6338.06",
+                    "$2566.35",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "3",
+                    "$221.70"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "8/1/2025",
+                    "$6338.06",
+                    "$2566.35",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "7",
+                    "$724.20"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "4/1/2025",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "12/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "2/1/2025",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "7/1/2025",
+                    "-$928.34",
+                    "-$372.13",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "",
+                    "-$15.28"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "7/1/2025",
+                    "-$928.34",
+                    "-$372.13",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$147.19"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "1/1/2025",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "12/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "5/1/2025",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "4/1/2025",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "3/1/2025",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "5/1/2025",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "2/1/2025",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "3/1/2025",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "7/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "7/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "11/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "10/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "10/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "9/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "8/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "6/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "5/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "3/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "6/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "5/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "4/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "8/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "7/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "7/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "4/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "11/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "9/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.14"
+                ],
+                [
+                    "L224259",
+                    "SITIJI IN",
+                    "8/1/2025",
+                    "3/1/2024",
+                    "-$14.36",
+                    "-$6.06",
+                    "17.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$58.62"
+                ],
+                [
+                    "L231111",
+                    "BTK RUSH IN",
+                    "7/1/2025",
+                    "8/1/2024",
+                    "-$297.96",
+                    "-$69.46",
+                    "20.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.08"
+                ],
+                [
+                    "L231111",
+                    "BTK RUSH IN",
+                    "7/1/2025",
+                    "9/1/2024",
+                    "-$297.96",
+                    "-$69.46",
+                    "20.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.08"
+                ],
+                [
+                    "L231111",
+                    "BTK RUSH IN",
+                    "7/1/2025",
+                    "10/1/2024",
+                    "-$297.96",
+                    "-$69.46",
+                    "20.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.08"
+                ],
+                [
+                    "L231111",
+                    "BTK RUSH IN",
+                    "7/1/2025",
+                    "11/1/2024",
+                    "-$297.96",
+                    "-$69.46",
+                    "20.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.08"
+                ],
+                [
+                    "L231111",
+                    "BTK RUSH IN",
+                    "7/1/2025",
+                    "12/1/2024",
+                    "-$297.96",
+                    "-$69.46",
+                    "20.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$61.08"
+                ],
+                [
+                    "L242052",
+                    "THE TOTAL PACKAGE LO",
+                    "5/1/2025",
+                    "4/1/2025",
+                    "-$974.10",
+                    "-$361.14",
+                    "9\\%",
+                    "Premium Equivalent",
+                    "$-2$",
+                    "-$87.66"
+                ],
+                [
+                    "L242052",
+                    "THE TOTAL PACKAGE LO",
+                    "5/1/2025",
+                    "3/1/2025",
+                    "-$974.10",
+                    "-$361.14",
+                    "9\\%",
+                    "Premium Equivalent",
+                    "$-2$",
+                    "-$87.66"
+                ],
+                [
+                    "L242393",
+                    "PATEL LOGISTICS IN",
+                    "8/1/2025",
+                    "5/1/2025",
+                    "-$298.00",
+                    "-$131.50",
+                    "10.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$31.29"
+                ],
+                [
+                    "L242815",
+                    "CONNECT LOGISTICS IN",
+                    "7/1/2025",
+                    "6/1/2025",
+                    "-$297.03",
+                    "-$114.66",
+                    "27.5\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$81.68"
+                ],
+                [
+                    "L242820",
+                    "BLUE MILE TRANSPORTA",
+                    "7/1/2025",
+                    "6/1/2025",
+                    "$474.13",
+                    "$136.02",
+                    "20.5\\%",
+                    "Premium Equivalent",
+                    "1",
+                    "$97.20"
+                ],
+                [
+                    "L243096",
+                    "PRIDE DELIVERY SERVIC",
+                    "7/1/2025",
+                    "7/1/2025",
+                    "$9078.08",
+                    "$3004.41",
+                    "27\\%",
+                    "Premium Equivalent",
+                    "9",
+                    "$1194.57"
+                ],
+                [
+                    "L243096",
+                    "PRIDE DELIVERY SERVIC",
+                    "7/1/2025",
+                    "6/1/2025",
+                    "-$491.59",
+                    "-$168.42",
+                    "27\\%",
+                    "Premium Equivalent",
+                    "$-1$",
+                    "-$132.73"
+                ],
+                [
+                    "L243096",
+                    "PRIDE DELIVERY SERVIC",
+                    "7/1/2025",
+                    "7/1/2025",
+                    "$9078.08",
+                    "$3004.41",
+                    "27\\%",
+                    "Premium Equivalent",
+                    "11",
+                    "$1256.53"
+                ]
+            ],
+            "page_number": 1,
+            "extractor": "mistral_ocr_2505",
+            "table_type": "commission_table",
+            "metadata": {
+                "total_tables_merged": 7,
+                "total_rows": 92,
+                "canonical_header": [
+                    "Group No.",
+                    "Group Name",
+                    "Billing Period",
+                    "Adj. Period",
+                    "Invoice Total",
+                    "Stoploss Total",
+                    "Agent Rate",
+                    "Calculation Method",
+                    "Census Ct.",
+                    "Paid Amount"
+                ],
+                "merged_from_tables": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6
+                ]
+            },
+            "summaryRows": [],
+            "bracket_processing": {
+                "enabled": true,
+                "total_cells_processed": 910,
+                "brackets_converted": 195,
+                "errors": 0,
+                "processing_method": "professional_accounting_standard",
+                "validation": {
+                    "total_cells_checked": 910,
+                    "negative_indicators_before": 130,
+                    "negative_values_after": 130,
+                    "data_integrity_preserved": true,
+                    "validation_errors": []
+                }
+            },
+            "summary_detection": {
+                "enabled": true,
+                "removed_indices": [
+                    2,
+                    6,
+                    12,
+                    13,
+                    14,
+                    16,
+                    17,
+                    18,
+                    58,
+                    59,
+                    65,
+                    66,
+                    67,
+                    70,
+                    71,
+                    72,
+                    74,
+                    75,
+                    76,
+                    78,
+                    79,
+                    80,
+                    82,
+                    83,
+                    84,
+                    88,
+                    89,
+                    90,
+                    91
+                ],
+                "detection_method": "multi_strategy_conservative",
+                "detection_confidence": 0.8199137931034483,
+                "total_rows_before": 92,
+                "total_rows_after": 63,
+                "removal_threshold": 0.75,
+                "strategies_used": [
+                    "semantic",
+                    "density",
+                    "position",
+                    "business_logic"
+                ],
+                "removed_row_details": [
+                    {
+                        "index": 2,
+                        "confidence": 0.8524999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.4,
+                            "business_logic": 0.9
+                        }
+                    },
+                    {
+                        "index": 6,
+                        "confidence": 0.8524999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.4,
+                            "business_logic": 0.9
+                        }
+                    },
+                    {
+                        "index": 12,
+                        "confidence": 0.8025,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.4,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 13,
+                        "confidence": 0.7925,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.2,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 14,
+                        "confidence": 0.8424999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.2,
+                            "business_logic": 0.9
+                        }
+                    },
+                    {
+                        "index": 16,
+                        "confidence": 0.8025,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.4,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 17,
+                        "confidence": 0.7925,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.2,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 18,
+                        "confidence": 0.8424999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.2,
+                            "business_logic": 0.9
+                        }
+                    },
+                    {
+                        "index": 58,
+                        "confidence": 0.7975,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.3,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 59,
+                        "confidence": 0.8474999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.3,
+                            "business_logic": 0.9
+                        }
+                    },
+                    {
+                        "index": 65,
+                        "confidence": 0.7975,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.3,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 66,
+                        "confidence": 0.7975,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.3,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 67,
+                        "confidence": 0.8474999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.3,
+                            "business_logic": 0.9
+                        }
+                    },
+                    {
+                        "index": 70,
+                        "confidence": 0.7975,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.3,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 71,
+                        "confidence": 0.7975,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.3,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 72,
+                        "confidence": 0.8474999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.3,
+                            "business_logic": 0.9
+                        }
+                    },
+                    {
+                        "index": 74,
+                        "confidence": 0.8075,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.5,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 75,
+                        "confidence": 0.8075,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.5,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 76,
+                        "confidence": 0.8574999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.5,
+                            "business_logic": 0.9
+                        }
+                    },
+                    {
+                        "index": 78,
+                        "confidence": 0.7775,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.6,
+                            "position": 0.5,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 79,
+                        "confidence": 0.8075,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.5,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 80,
+                        "confidence": 0.8574999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.5,
+                            "business_logic": 0.9
+                        }
+                    },
+                    {
+                        "index": 82,
+                        "confidence": 0.7775,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.6,
+                            "position": 0.5,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 83,
+                        "confidence": 0.8075,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.5,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 84,
+                        "confidence": 0.8574999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.5,
+                            "business_logic": 0.9
+                        }
+                    },
+                    {
+                        "index": 88,
+                        "confidence": 0.7775,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.6,
+                            "position": 0.5,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 89,
+                        "confidence": 0.8075,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.85)",
+                            "Low data density compared to average (score: 0.80)",
+                            "Matches business logic patterns (score: 0.80)"
+                        ],
+                        "scores": {
+                            "semantic": 0.85,
+                            "density": 0.8,
+                            "position": 0.5,
+                            "business_logic": 0.8
+                        }
+                    },
+                    {
+                        "index": 90,
+                        "confidence": 0.8574999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.5,
+                            "business_logic": 0.9
+                        }
+                    },
+                    {
+                        "index": 91,
+                        "confidence": 0.8674999999999999,
+                        "evidence": [
+                            "Strong semantic indicators (score: 0.95)",
+                            "Appears in typical summary position (score: 0.70)",
+                            "Matches business logic patterns (score: 0.90)"
+                        ],
+                        "scores": {
+                            "semantic": 0.95,
+                            "density": 0.6,
+                            "position": 0.7,
+                            "business_logic": 0.9
+                        }
+                    }
+                ]
+            },
+            "header": [
+                "Group No.",
+                "Group Name",
+                "Billing Period",
+                "Adj. Period",
+                "Invoice Total",
+                "Stoploss Total",
+                "Agent Rate",
+                "Calculation Method",
+                "Census Ct.",
+                "Paid Amount"
+            ]
+        }
+    ],
+    "file_name": "statements/6890e41e-e373-4d33-bf87-41888b5a1263/08.06.2025 Allied Innovative Payment 2.pdf",
+    "gcs_url": "https://storage.googleapis.com/pdf_extraction_files_saver/statements/6890e41e-e373-4d33-bf87-41888b5a1263/08.06.2025%20Allied%20Innovative%20Payment%202.pdf?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=docsai-table-extractor%40pdf-tables-extractor-465009.iam.gserviceaccount.com%2F20251015%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20251015T204916Z&X-Goog-Expires=3599&X-Goog-SignedHeaders=host&response-content-disposition=inline&response-content-type=application%2Fpdf&X-Goog-Signature=9c75971ff6121605cf4a1668ddaa1e1a9130bdd9c330214bdf1e4091c173da73aa7743e9a269cc6ab0752defea5b2cd0b1279f142491a707ab206f87bb0f5cb736ac5193356ceef8de13b0791a6c4f6fe7fce71546bafe9d61e10453df715143fc3de2fc6aae95a3868b2d891aa3a44c2f2eacdf36af8e5cad09e4a7d524783ce3d5cdb27b4f2a13d4e1bdd8e39c0043efcdad269042721e6326e113a3d7784b71c83cc60cf15c1b9707f19bb9fa98c1d3a7ea6d831fdff431782f323c364411d27878f9ae60b75ed4c8b5f8cd91c5425ba9b8795cc9d5c86d32d24ad43d49916497973653c4b3288a6d0feeed7b4d9c3645719872fe163851d0e08c7350ab80",
+    "gcs_key": "statements/6890e41e-e373-4d33-bf87-41888b5a1263/08.06.2025 Allied Innovative Payment 2.pdf",
+    "company_id": "6890e41e-e373-4d33-bf87-41888b5a1263",
+    "carrier_id": "6890e41e-e373-4d33-bf87-41888b5a1263",
+    "extraction_method": "mistral",
+    "file_type": "pdf",
+    "processing_time": 37.155549,
+    "quality_summary": {},
+    "extraction_config": {},
+    "format_learning": {
+        "found_match": true,
+        "match_score": 0.8400000000000001,
+        "learned_format": {
+            "format_signature": "6f736ac611e1789c131a993b10321314",
+            "headers": [
+                "Group No.",
+                "Group Name",
+                "Billing Period",
+                "Adj. Period",
+                "Invoice Total",
+                "Stoploss Total",
+                "Agent Rate",
+                "Calculation Method",
+                "Census Ct.",
+                "Paid Amount"
+            ],
+            "column_types": {
+                "Group No.": "string",
+                "Agent Rate": "string",
+                "Census Ct.": "number",
+                "Group Name": "string",
+                "Adj. Period": "date",
+                "Paid Amount": "number",
+                "Invoice Total": "number",
+                "Billing Period": "date",
+                "Stoploss Total": "number",
+                "Calculation Method": "string"
+            },
+            "column_patterns": {
+                "Adj. Period": "\\d{1,2}/\\d{1,2}/\\d{2,4}",
+                "Billing Period": "\\d{1,2}/\\d{1,2}/\\d{2,4}"
+            },
+            "field_mapping": {
+                "Group No.": "Policy Number",
+                "Agent Rate": "Commission Rate",
+                "Census Ct.": "Total Subscribers",
+                "Group Name": "Client Name",
+                "Adj. Period": "Adjustment Period Start",
+                "Paid Amount": "Total Commission Paid",
+                "Invoice Total": "Invoice Total",
+                "Billing Period": "Coverage Period Start",
+                "Stoploss Total": "Stoploss Total",
+                "Calculation Method": "Plan Type"
+            },
+            "table_editor_settings": {},
+            "confidence_score": 95,
+            "usage_count": 17
+        },
+        "suggested_mapping": {
+            "Group No.": "Policy Number",
+            "Agent Rate": "Commission Rate",
+            "Census Ct.": "Total Subscribers",
+            "Group Name": "Client Name",
+            "Adj. Period": "Adjustment Period Start",
+            "Paid Amount": "Total Commission Paid",
+            "Invoice Total": "Invoice Total",
+            "Billing Period": "Coverage Period Start",
+            "Stoploss Total": "Stoploss Total",
+            "Calculation Method": "Plan Type"
+        },
+        "table_editor_settings": {}
+    },
+    "metadata": {},
+    "extracted_carrier": "ALLIED",
+    "extracted_date": "2025-08-06",
+    "document_metadata": {
+        "total_pages": 7,
+        "extraction_method": "mistral_ocr_2505",
+        "model": "mistral-ocr-latest",
+        "carrier_name": "ALLIED",
+        "carrier_confidence": 0.95,
+        "carrier_source": "gpt4o_vision",
+        "statement_date": "2025-08-06",
+        "date_confidence": 0.9,
+        "date_source": "gpt4o_vision"
+    },
+    "ai_intelligence": {
+        "enabled": true,
+        "field_mapping": {
+            "ai_enabled": false
+        },
+        "plan_type_detection": {
+            "ai_enabled": true,
+            "detected_plan_types": [
+                {
+                    "plan_type": "Medical",
+                    "plan_type_id": "250cc087-07f9-450e-9913-9c08ba547872",
+                    "confidence": 0.9,
+                    "reasoning": "The document contains indicators such as 'Stoploss Total' and 'Census Ct.' which are commonly associated with medical insurance plans. The premium amounts are also consistent with medical insurance.",
+                    "evidence": [
+                        "Header 'Stoploss Total' is commonly associated with medical insurance",
+                        "Header 'Census Ct.' suggests member counts typical in medical plans",
+                        "Premium amounts in the sample data are consistent with medical insurance ranges"
+                    ],
+                    "requires_review": false
+                }
+            ],
+            "confidence": 0.9,
+            "multi_plan_document": false,
+            "statistics": {}
+        },
+        "table_selection": {
+            "enabled": false,
+            "selected_table_index": 0,
+            "confidence": 1,
+            "single_table": true,
+            "total_tables": 1
+        },
+        "overall_confidence": 0.9
+    },
+    "message": "Successfully extracted 1 tables using mistral method. AI field mapping will be performed after table review.",
+    "extraction_id": "f6462614-6841-4433-8f51-f09f26c3b787"
+}
