@@ -22,7 +22,9 @@ from mistralai import Mistral
 from mistralai.extra import response_format_from_pydantic_model
 
 # Import timeout configuration
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
+server_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+if server_path not in sys.path:
+    sys.path.insert(0, server_path)
 from config.timeouts import timeout_settings, TimeoutSettings
 
 # Import retry logic
@@ -44,7 +46,7 @@ except ImportError:
     ML_AVAILABLE = False
 
 # Import normalization utilities
-from app.services.extraction_utils import normalize_multi_line_headers
+from app.services.extraction.extraction_utils import normalize_multi_line_headers
 
 if not ML_AVAILABLE:
     logging.warning("ML libraries not available. Summary detection will use simplified approach.")
@@ -69,7 +71,7 @@ from .prompts import MistralPrompts
 from .utils import PDFProcessor, DataValidator, JSONProcessor, QualityAssessor, CarrierDetector, DateExtractor, TableStructureDetector
 
 # Import quality validation service
-from ..quality_validation_service import QualityValidationService
+from app.services.data_processing.quality_validation_service import QualityValidationService
 
 # Import new enhancement modules
 from .enhanced_summary_detector import EnhancedSummaryRowDetector as NewEnhancedSummaryRowDetector

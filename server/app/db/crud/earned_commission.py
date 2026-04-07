@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Any
 import asyncio
 import time
 from decimal import Decimal
-from ...services.company_name_service import CompanyNameDetectionService
+from ...services.data_processing.company_name_service import CompanyNameDetectionService
 
 # Create a global instance of the company name service for cleaning
 company_name_service = CompanyNameDetectionService()

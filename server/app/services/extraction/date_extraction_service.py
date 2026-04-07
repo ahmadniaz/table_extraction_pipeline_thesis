@@ -15,10 +15,10 @@ import tempfile
 import os
 
 # Import OCR and document processing capabilities
-from app.new_extraction_services.models.advanced_ocr_engine import AdvancedOCREngine
-from app.new_extraction_services.utils.config import get_config
-from app.new_extraction_services.utils.logging_utils import setup_logging, get_logger
-from app.new_extraction_services.core.document_processor import DocumentProcessor
+from app.services.docling.models.advanced_ocr_engine import AdvancedOCREngine
+from app.services.docling.utils.config import get_config
+from app.services.docling.utils.logging_utils import setup_logging, get_logger
+from app.services.docling.core.document_processor import DocumentProcessor
 
 # For PDF processing
 import pdfplumber

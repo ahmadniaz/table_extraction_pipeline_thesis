@@ -1,5 +1,5 @@
 # Apply compatibility fixes first
-from app.new_extraction_services.utils.compatibility import apply_compatibility_fixes
+from app.services.docling.utils.compatibility import apply_compatibility_fixes
 apply_compatibility_fixes()
 
 from fastapi import FastAPI, Request, Response, HTTPException
@@ -41,12 +41,12 @@ async def shutdown_event_handler():
         shutdown_event.set()
         
         # Stop process monitoring
-        from app.services.process_monitor import process_monitor
+        from app.services.infrastructure.process_monitor import process_monitor
         await process_monitor.stop_monitoring()
         logger.info("Process monitoring stopped")
         
         # Import connection manager
-        from app.services.websocket_service import connection_manager
+        from app.services.infrastructure.websocket_service import connection_manager
         
         # Notify active WebSocket connections
         for upload_id in list(connection_manager.active_connections.keys()):
@@ -99,11 +99,11 @@ async def health_check_detailed():
         cpu_percent = psutil.cpu_percent(interval=0.1)
         
         # Get WebSocket connection info
-        from app.services.websocket_service import connection_manager
+        from app.services.infrastructure.websocket_service import connection_manager
         ws_connections = connection_manager.get_connection_count()
         
         # Get process monitor status
-        from app.services.process_monitor import process_monitor
+        from app.services.infrastructure.process_monitor import process_monitor
         process_status = process_monitor.get_health_status()
         
         return {
@@ -302,7 +302,7 @@ async def startup_event():
     task.add_done_callback(background_tasks.discard)
     
     # Start process monitoring for long-running document extractions
-    from app.services.process_monitor import process_monitor
+    from app.services.infrastructure.process_monitor import process_monitor
     await process_monitor.start_monitoring()
     logger.info("Process monitoring started for large file processing")
     
@@ -314,7 +314,9 @@ if __name__ == "__main__":
     import os
     
     # Import timeout configuration
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+    server_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    if server_path not in sys.path:
+        sys.path.insert(0, server_path)
     from config.timeouts import timeout_settings
     
     # Configure Uvicorn for large file processing with enhanced timeout settings

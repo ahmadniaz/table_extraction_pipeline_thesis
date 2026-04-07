@@ -13,7 +13,7 @@ from typing import Dict, Any
 from app.db.database import get_db
 from app.db.models import User
 from app.db.otp_schemas import UserProfileSchema
-from app.services.jwt_service import jwt_service
+from app.services.auth.jwt_service import jwt_service
 from app.utils.auth_utils import get_user_by_email
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])

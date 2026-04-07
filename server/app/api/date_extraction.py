@@ -6,7 +6,7 @@ This API provides endpoints for extracting dates from the first page of document
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import crud
-from app.services.date_extraction_service import get_date_extraction_service
+from app.services.extraction.date_extraction_service import get_date_extraction_service
 from app.config import get_db
 from app.utils.db_retry import with_db_retry
 from app.dependencies.auth_dependencies import get_current_user_hybrid
@@ -14,7 +14,7 @@ from app.db.models import User
 import os
 import asyncio
 from datetime import datetime
-from app.services.gcs_utils import upload_file_to_gcs, get_gcs_file_url
+from app.services.infrastructure.gcs_utils import upload_file_to_gcs, get_gcs_file_url
 import logging
 from typing import Optional, Dict, Any
 

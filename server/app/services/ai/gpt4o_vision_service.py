@@ -8,8 +8,8 @@ from datetime import datetime
 from PIL import Image, ImageEnhance, ImageFilter
 import io
 from openai import OpenAI
-from .data_formatting_service import DataFormattingService
-from .company_name_service import CompanyNameDetectionService
+from app.services.data_processing.data_formatting_service import DataFormattingService
+from app.services.data_processing.company_name_service import CompanyNameDetectionService
 
 logger = logging.getLogger(__name__)
 

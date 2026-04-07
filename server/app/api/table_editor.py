@@ -13,7 +13,7 @@ from app.db.crud import save_edited_tables, get_edited_tables, update_upload_tab
 from app.db import crud, schemas
 from app.config import get_db
 from app.utils.db_retry import with_db_retry
-from app.services.format_learning_service import FormatLearningService
+from app.services.data_processing.format_learning_service import FormatLearningService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

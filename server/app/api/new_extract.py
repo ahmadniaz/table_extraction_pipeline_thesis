@@ -7,23 +7,23 @@ maintaining compatibility with the existing server structure.
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import crud, schemas
-from app.services.new_extraction_service import get_new_extraction_service
-from app.services.enhanced_extraction_service import EnhancedExtractionService
+from app.services.extraction.new_extraction_service import get_new_extraction_service
+from app.services.extraction.enhanced_extraction_service import EnhancedExtractionService
 from app.services.claude.service import ClaudeDocumentAIService
 from app.config import get_db
 from app.utils.db_retry import with_db_retry
 from app.dependencies.auth_dependencies import get_current_user_hybrid
 from app.db.models import User
-from app.services.duplicate_detection_service import DuplicateDetectionService
-from app.services.user_profile_service import UserProfileService
-from app.services.audit_logging_service import AuditLoggingService
+from app.services.data_processing.duplicate_detection_service import DuplicateDetectionService
+from app.services.auth.user_profile_service import UserProfileService
+from app.services.infrastructure.audit_logging_service import AuditLoggingService
 import asyncio
 import os
 from datetime import datetime
 from uuid import uuid4, UUID
-from app.services.gcs_utils import upload_file_to_gcs, get_gcs_file_url, download_file_from_gcs, generate_gcs_signed_url
-from app.services.extraction_utils import stitch_multipage_tables
-from app.services.websocket_service import connection_manager
+from app.services.infrastructure.gcs_utils import upload_file_to_gcs, get_gcs_file_url, download_file_from_gcs, generate_gcs_signed_url
+from app.services.extraction.extraction_utils import stitch_multipage_tables
+from app.services.infrastructure.websocket_service import connection_manager
 import logging
 from typing import Optional, Dict, Any
 from fastapi.responses import JSONResponse
@@ -264,7 +264,7 @@ async def extract_tables_smart(
         logger.info(f"📤 Uploading file to GCS: {gcs_key}")
         
         # Verify GCS is available before uploading
-        from app.services.gcs_utils import gcs_service
+        from app.services.infrastructure.gcs_utils import gcs_service
         if not gcs_service.is_available():
             logger.error("❌ GCS service is not available. Check GOOGLE_APPLICATION_CREDENTIALS.")
             raise HTTPException(
@@ -411,7 +411,7 @@ async def extract_tables_smart(
         
         if extracted_carrier and extraction_result.get('tables'):
             try:
-                from app.services.format_learning_service import FormatLearningService
+                from app.services.data_processing.format_learning_service import FormatLearningService
                 format_learning_service = FormatLearningService()
                 
                 # Find carrier by name to get carrier_id
@@ -446,7 +446,7 @@ async def extract_tables_smart(
                         new_gcs_key = f"statements/{carrier.id}/{file.filename}"
                         
                         # Move file in GCS (copy to new location and delete old)
-                        from app.services.gcs_utils import copy_gcs_file, delete_gcs_file
+                        from app.services.infrastructure.gcs_utils import copy_gcs_file, delete_gcs_file
                         if copy_gcs_file(old_gcs_key, new_gcs_key):
                             delete_gcs_file(old_gcs_key)
                             gcs_key = new_gcs_key
@@ -492,7 +492,7 @@ async def extract_tables_smart(
                         logger.info(f"🔍 Multiple tables detected ({len(extraction_result['tables'])}), analyzing for field mapping suitability")
                         
                         try:
-                            from app.services.table_suitability_service import TableSuitabilityService
+                            from app.services.ai.table_suitability_service import TableSuitabilityService
                             table_suitability_service = TableSuitabilityService()
                             
                             # Analyze all tables for mapping suitability
@@ -619,7 +619,7 @@ async def extract_tables_smart(
                     # ===== AI PLAN TYPE DETECTION (DURING EXTRACTION) =====
                     # Plan type detection happens here, but field mapping happens after table editing
                     try:
-                        from app.services.ai_plan_type_detection_service import AIPlanTypeDetectionService
+                        from app.services.ai.ai_plan_type_detection_service import AIPlanTypeDetectionService
                         
                         ai_plan_service = AIPlanTypeDetectionService()
                         
@@ -894,7 +894,7 @@ async def extract_tables_gpt(
         logger.info(f"Processing PDF: {temp_pdf_path} (downloaded from GCS)")
         
         # Use the GPT-5 Vision service for extraction
-        from app.services.gpt4o_vision_service import GPT4oVisionService
+        from app.services.ai.gpt4o_vision_service import GPT4oVisionService
         gpt4o_service = GPT4oVisionService()
         
         if not gpt4o_service.is_available():
@@ -920,7 +920,7 @@ async def extract_tables_gpt(
         
         # Extract document metadata (carrier, date, broker) from first page
         logger.info("Extracting document metadata (carrier, date, broker)...")
-        from app.services.enhanced_extraction_service import EnhancedExtractionService
+        from app.services.extraction.enhanced_extraction_service import EnhancedExtractionService
         enhanced_service = EnhancedExtractionService()
         
         # Create a mock progress tracker for metadata extraction
@@ -1087,7 +1087,7 @@ async def extract_tables_gpt(
         format_learning_data = None
         if frontend_tables and len(frontend_tables) > 0:
             try:
-                from app.services.format_learning_service import FormatLearningService
+                from app.services.data_processing.format_learning_service import FormatLearningService
                 format_learning_service = FormatLearningService()
                 
                 # Get first table for format learning
@@ -1277,7 +1277,7 @@ async def extract_tables_google_docai(
         logger.info(f"Processing PDF: {temp_pdf_path} (downloaded from GCS)")
         
         # Use Google DOC AI extractor
-        from app.services.extractor_google_docai import GoogleDocAIExtractor
+        from app.services.google_docai import GoogleDocAIExtractor
         extractor = GoogleDocAIExtractor()
         
         if not extractor.is_available():
@@ -1353,7 +1353,7 @@ async def extract_tables_google_docai(
         format_learning_data = None
         if frontend_tables and len(frontend_tables) > 0:
             try:
-                from app.services.format_learning_service import FormatLearningService
+                from app.services.data_processing.format_learning_service import FormatLearningService
                 format_learning_service = FormatLearningService()
                 
                 # Get first table for format learning

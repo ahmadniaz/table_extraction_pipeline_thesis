@@ -13,8 +13,10 @@ import uuid
 import sys
 import os
 
-# Add parent directory to path to import config
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+# Add server directory to path to import config
+server_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+if server_path not in sys.path:
+    sys.path.insert(0, server_path)
 from config.timeouts import timeout_settings
 
 logger = logging.getLogger(__name__)

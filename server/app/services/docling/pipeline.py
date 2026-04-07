@@ -9,16 +9,16 @@ from enum import Enum
 import json
 import re
 
-from ..core.document_processor import DocumentProcessor, ProcessedDocument
-from ..core.multipage_handler import MultiPageTableHandler
-from ..models.tableformer import TableFormerModel, OCREngine, TableStructure
-from ..models.advanced_tableformer import ProductionTableFormer
-from ..models.advanced_ocr_engine import AdvancedOCREngine
-from ..processors.financial_processor import SmartFinancialDocumentProcessor
-from ..evaluation.advanced_metrics import AdvancedEvaluationMetrics
-from ..utils.config import Config
-from ..utils.logging_utils import get_logger, LogExtractionOperation
-from ..utils.validation import ExtractionResultValidator, ValidationResult
+from .core.document_processor import DocumentProcessor, ProcessedDocument
+from .core.multipage_handler import MultiPageTableHandler
+from .models.tableformer import TableFormerModel, OCREngine, TableStructure
+from .models.advanced_tableformer import ProductionTableFormer
+from .models.advanced_ocr_engine import AdvancedOCREngine
+from .processors import SmartFinancialDocumentProcessor
+from .evaluation import AdvancedEvaluationMetrics
+from .utils.config import Config
+from .utils.logging_utils import get_logger, LogExtractionOperation
+from .utils.validation import ExtractionResultValidator, ValidationResult
 
 
 class ExtractionStage(Enum):

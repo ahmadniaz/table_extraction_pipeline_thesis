@@ -7,7 +7,7 @@ from app.config import get_db
 from typing import List
 from uuid import UUID
 from pydantic import BaseModel
-from app.services.gcs_utils import generate_gcs_signed_url, gcs_service
+from app.services.infrastructure.gcs_utils import generate_gcs_signed_url, gcs_service
 from app.dependencies.auth_dependencies import get_current_user_hybrid
 from app.db.models import User
 import logging

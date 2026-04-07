@@ -16,8 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_db
 from app.dependencies.auth_dependencies import get_current_user_hybrid
 from app.db.models import User
-from app.services.ai_field_mapping_service import AIFieldMappingService
-from app.services.ai_plan_type_detection_service import AIPlanTypeDetectionService
+from app.services.ai.ai_field_mapping_service import AIFieldMappingService
+from app.services.ai.ai_plan_type_detection_service import AIPlanTypeDetectionService
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from uuid import UUID

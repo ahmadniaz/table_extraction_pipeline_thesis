@@ -7,7 +7,7 @@ from datetime import datetime
 from app.db.database import get_db
 from app.db.models import User
 from app.utils.auth_utils import get_user_by_email, verify_token, update_session_activity, check_session_inactivity
-from app.services.jwt_service import jwt_service
+from app.services.auth.jwt_service import jwt_service
 
 # Security schemes
 security_bearer = HTTPBearer(auto_error=False)  # Don't auto-raise on missing token

@@ -50,7 +50,7 @@ from .utils import (
 )
 
 # Import existing utilities for compatibility
-from app.services.extraction_utils import normalize_multi_line_headers, normalize_statement_date
+from app.services.extraction.extraction_utils import normalize_multi_line_headers, normalize_statement_date
 
 logger = logging.getLogger(__name__)
 

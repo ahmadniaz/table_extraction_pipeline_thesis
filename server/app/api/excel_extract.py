@@ -7,14 +7,14 @@ with the existing server structure and returning results in the same format.
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import crud, schemas
-from app.services.excel_extraction_service import get_excel_extraction_service
+from app.services.extraction.excel_extraction_service import get_excel_extraction_service
 from app.config import get_db
 from app.utils.db_retry import with_db_retry
 import os
 import shutil
 from datetime import datetime
 from uuid import uuid4
-from app.services.gcs_utils import upload_file_to_gcs, get_gcs_file_url, download_file_from_gcs, generate_gcs_signed_url
+from app.services.infrastructure.gcs_utils import upload_file_to_gcs, get_gcs_file_url, download_file_from_gcs, generate_gcs_signed_url
 import logging
 import asyncio
 from typing import Optional, Dict, Any, List
@@ -92,7 +92,7 @@ async def extract_tables_excel(
         logger.info(f"📤 Uploading file to GCS: {gcs_key}")
         
         # Verify GCS is available before uploading
-        from app.services.gcs_utils import gcs_service
+        from app.services.infrastructure.gcs_utils import gcs_service
         if not gcs_service.is_available():
             logger.error("❌ GCS service is not available. Check GOOGLE_APPLICATION_CREDENTIALS.")
             raise HTTPException(
@@ -158,7 +158,7 @@ async def extract_tables_excel(
         format_learning_data = None
         if response_data.get("tables") and len(response_data["tables"]) > 0:
             try:
-                from app.services.format_learning_service import FormatLearningService
+                from app.services.data_processing.format_learning_service import FormatLearningService
                 format_learning_service = FormatLearningService()
                 
                 # Get first table for format learning
@@ -406,7 +406,7 @@ async def extract_tables_excel_bytes(
             format_learning_data = None
             if response_data.get("tables") and len(response_data["tables"]) > 0:
                 try:
-                    from app.services.format_learning_service import FormatLearningService
+                    from app.services.data_processing.format_learning_service import FormatLearningService
                     format_learning_service = FormatLearningService()
                     
                     # Get first table for format learning
@@ -703,7 +703,7 @@ async def extract_tables_excel_s3(
             format_learning_data = None
             if response_data.get("tables") and len(response_data["tables"]) > 0:
                 try:
-                    from app.services.format_learning_service import FormatLearningService
+                    from app.services.data_processing.format_learning_service import FormatLearningService
                     format_learning_service = FormatLearningService()
                     
                     # Get first table for format learning

@@ -10,9 +10,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import crud
 from app.config import get_db
-from app.services.gpt4o_vision_service import GPT4oVisionService
+from app.services.ai.gpt4o_vision_service import GPT4oVisionService
 # Removed old extraction pipeline import - using new extraction service instead
-from app.services.gcs_utils import download_file_from_gcs
+from app.services.infrastructure.gcs_utils import download_file_from_gcs
 import uuid
 import tempfile
 from pydantic import BaseModel

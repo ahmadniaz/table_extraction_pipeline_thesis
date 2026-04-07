@@ -6,7 +6,7 @@ Provides endpoints for validating detected company names
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
-from app.services.company_name_service import CompanyNameDetectionService
+from app.services.data_processing.company_name_service import CompanyNameDetectionService
 
 router = APIRouter(prefix="/api", tags=["company-validation"])
 

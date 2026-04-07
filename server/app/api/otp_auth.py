@@ -14,10 +14,10 @@ from app.db.otp_schemas import (
     UserRegistrationSchema, LoginResponseSchema, TokenRefreshSchema,
     LogoutResponseSchema, UserProfileSchema, AuthStatusSchema
 )
-from app.services.otp_service import otp_service
-from app.services.jwt_service import jwt_service
+from app.services.auth.otp_service import otp_service
+from app.services.auth.jwt_service import jwt_service
 from app.utils.auth_utils import get_user_by_email, create_user_session, invalidate_session, check_session_inactivity, update_session_activity
-from app.services.audit_logging_service import AuditLoggingService
+from app.services.infrastructure.audit_logging_service import AuditLoggingService
 
 router = APIRouter(prefix="/api/auth/otp", tags=["OTP Authentication"])
 security = HTTPBearer()

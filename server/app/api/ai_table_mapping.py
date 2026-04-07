@@ -96,7 +96,7 @@ async def switch_mapping_table(
         logger.info(f"🎯 Switching to table {request.new_table_index} with {len(headers)} headers and {len(rows)} rows")
         
         # Re-run AI field mapping on the new table
-        from app.services.ai_field_mapping_service import AIFieldMappingService
+        from app.services.ai.ai_field_mapping_service import AIFieldMappingService
         ai_mapping_service = AIFieldMappingService()
         
         if not ai_mapping_service.is_available():
@@ -235,7 +235,7 @@ async def analyze_table_suitability(
             raise HTTPException(status_code=400, detail="No tables provided for analysis")
         
         # Use table suitability service
-        from app.services.table_suitability_service import TableSuitabilityService
+        from app.services.ai.table_suitability_service import TableSuitabilityService
         suitability_service = TableSuitabilityService()
         
         if not suitability_service.is_available():

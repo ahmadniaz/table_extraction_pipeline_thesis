@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import crud, schemas
 from app.config import get_db
 from app.utils.db_retry import with_db_retry
-from app.services.format_learning_service import FormatLearningService
+from app.services.data_processing.format_learning_service import FormatLearningService
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 

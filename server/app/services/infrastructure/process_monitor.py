@@ -215,7 +215,7 @@ class ProcessMonitor:
             
             # Send timeout notification via WebSocket if available
             try:
-                from app.services.websocket_service import connection_manager
+                from app.services.infrastructure.websocket_service import connection_manager
                 await connection_manager.send_error(
                     upload_id,
                     f"Processing timeout - the document processing exceeded {elapsed:.0f} seconds. "

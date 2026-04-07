@@ -8,7 +8,7 @@ from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
 from fastapi.security import HTTPBearer
-from app.services.websocket_service import connection_manager
+from app.services.infrastructure.websocket_service import connection_manager
 from app.dependencies.auth_dependencies import get_current_user_hybrid
 from app.db.models import User
 import uuid
@@ -45,7 +45,7 @@ async def websocket_progress_endpoint(
     if token:
         try:
             # Validate JWT token using the same logic as other endpoints
-            from app.services.jwt_service import jwt_service
+            from app.services.auth.jwt_service import jwt_service
             payload = jwt_service.verify_token(token)
             if payload and 'sub' in payload:
                 user_id = payload['sub']

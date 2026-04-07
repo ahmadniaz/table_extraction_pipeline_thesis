@@ -12,20 +12,20 @@ from typing import Dict, List, Optional, Any, Union
 import tempfile
 import os
 from datetime import datetime
-from app.new_extraction_services.utils.compatibility import apply_compatibility_fixes
+from app.services.docling.utils.compatibility import apply_compatibility_fixes
 
 # Apply compatibility fixes
 apply_compatibility_fixes()
 
 
 # Import the new extraction solution
-from app.new_extraction_services.utils.config import get_config
-from app.new_extraction_services.utils.logging_utils import setup_logging, get_logger
-from app.new_extraction_services.pipeline.extraction_pipeline import ExtractionPipeline, ExtractionOptions
-from app.new_extraction_services.core.document_processor import DocumentProcessor
-from app.new_extraction_services.models.advanced_tableformer import ProductionTableFormer
-from app.new_extraction_services.models.advanced_ocr_engine import AdvancedOCREngine
-from app.services.company_name_service import CompanyNameDetectionService
+from app.services.docling.utils.config import get_config
+from app.services.docling.utils.logging_utils import setup_logging, get_logger
+from app.services.docling.pipeline import ExtractionPipeline, ExtractionOptions
+from app.services.docling.core.document_processor import DocumentProcessor
+from app.services.docling.models.advanced_tableformer import ProductionTableFormer
+from app.services.docling.models.advanced_ocr_engine import AdvancedOCREngine
+from app.services.data_processing.company_name_service import CompanyNameDetectionService
 
 
 class NewExtractionService:

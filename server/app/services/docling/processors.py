@@ -9,8 +9,8 @@ import numpy as np
 from statistics import mean, median
 import time
 import json
-from ..utils.config import Config
-from ..utils.logging_utils import get_logger
+from .utils.config import Config
+from .utils.logging_utils import get_logger
 
 @dataclass
 class PatternMatch:

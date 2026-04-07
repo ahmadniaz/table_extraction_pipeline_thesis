@@ -5,20 +5,30 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Render PostgreSQL connection (preferred)
+# Local PostgreSQL connection (preferred)
+LOCAL_DB_URL = os.environ.get("LOCAL_DB_KEY")
+
+# Render PostgreSQL connection (fallback)
 RENDER_DB_URL = os.environ.get("RENDER_DB_KEY")
 
-# Fallback to Supabase if Render not configured
+# Supabase as last fallback
 SUPABASE_DB_URL = os.environ.get("SUPABASE_DB_KEY")
 
-# Use Render if available, otherwise use Supabase
-if RENDER_DB_URL:
+# Use Local DB if available, otherwise use Render, then Supabase
+if LOCAL_DB_URL:
+    # Ensure we use asyncpg dialect
+    if not LOCAL_DB_URL.startswith("postgresql+asyncpg://"):
+        DATABASE_URL = LOCAL_DB_URL.replace("postgresql://", "postgresql+asyncpg://")
+    else:
+        DATABASE_URL = LOCAL_DB_URL
+    print("✅ Using Local PostgreSQL database")
+elif RENDER_DB_URL:
     # Ensure we use asyncpg dialect
     if not RENDER_DB_URL.startswith("postgresql+asyncpg://"):
         DATABASE_URL = RENDER_DB_URL.replace("postgresql://", "postgresql+asyncpg://")
     else:
         DATABASE_URL = RENDER_DB_URL
-    print("✅ Using Render PostgreSQL database")
+    print("⚠️  Using Render PostgreSQL database (fallback)")
 elif SUPABASE_DB_URL:
     # Ensure we use asyncpg dialect
     if not SUPABASE_DB_URL.startswith("postgresql+asyncpg://"):
@@ -28,8 +38,8 @@ elif SUPABASE_DB_URL:
     print("⚠️  Using Supabase PostgreSQL database (fallback)")
 else:
     # For local development, use a default database URL
-    DATABASE_URL = "postgresql+asyncpg://user:password@localhost/commission_tracker"
-    print("⚠️  Using local database (development mode)")
+    DATABASE_URL = "postgresql+asyncpg://postgres@localhost:5432/thesis_commission_tracker"
+    print("⚠️  Using default local database (development mode)")
 
 engine = create_async_engine(
     DATABASE_URL,

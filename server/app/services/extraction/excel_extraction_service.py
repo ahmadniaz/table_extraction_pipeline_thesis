@@ -446,7 +446,7 @@ class ExcelExtractionService:
             current_headers = sample_headers[0] if sample_headers else [f"Column_{i+1}" for i in range(cols)]
             
             # Import here to avoid circular imports
-            from app.services.format_learning_service import FormatLearningService
+            from app.services.data_processing.format_learning_service import FormatLearningService
             format_learning_service = FormatLearningService()
             
             # Find matching format

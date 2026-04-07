@@ -228,7 +228,7 @@ class AIFieldMappingService:
         try:
             # CRITICAL FIX: Use the same signature generation logic as format learning service
             # Import the format learning service to use consistent signature generation
-            from app.services.format_learning_service import FormatLearningService
+            from app.services.data_processing.format_learning_service import FormatLearningService
             format_learning_service = FormatLearningService()
             
             # Generate format signature using the same method as when saving
@@ -316,7 +316,7 @@ class AIFieldMappingService:
         """Calculate similarity between two header lists with improved matching"""
         try:
             # Use format learning service's header similarity calculation for consistency
-            from app.services.format_learning_service import FormatLearningService
+            from app.services.data_processing.format_learning_service import FormatLearningService
             format_learning_service = FormatLearningService()
             
             similarity = format_learning_service._calculate_header_similarity(headers1, headers2)

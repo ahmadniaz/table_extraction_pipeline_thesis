@@ -19,17 +19,19 @@ from fastapi import HTTPException
 from dotenv import load_dotenv
 load_dotenv()
 
-from app.services.websocket_service import create_progress_tracker
-from app.services.new_extraction_service import NewExtractionService
-from app.services.gpt4o_vision_service import GPT4oVisionService
-from app.services.extractor_google_docai import GoogleDocAIExtractor
+from app.services.infrastructure.websocket_service import create_progress_tracker
+from app.services.extraction.new_extraction_service import NewExtractionService
+from app.services.ai.gpt4o_vision_service import GPT4oVisionService
+from app.services.google_docai import GoogleDocAIExtractor
 from app.services.mistral.service import MistralDocumentAIService
 from app.services.claude.service import ClaudeDocumentAIService
-from app.services.excel_extraction_service import ExcelExtractionService
-from app.services.extraction_utils import normalize_statement_date, normalize_multi_line_headers
+from app.services.extraction.excel_extraction_service import ExcelExtractionService
+from app.services.extraction.extraction_utils import normalize_statement_date, normalize_multi_line_headers
 
 # Import timeout configuration
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+server_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+if server_path not in sys.path:
+    sys.path.insert(0, server_path)
 from config.timeouts import timeout_settings
 
 logger = logging.getLogger(__name__)
@@ -405,7 +407,7 @@ class EnhancedExtractionService:
         )
 
         # CRITICAL: Normalize headers for smart extraction
-        from app.services.extraction_utils import normalize_multi_line_headers
+        from app.services.extraction.extraction_utils import normalize_multi_line_headers
         for table in processed_data:
             raw_headers = table.get('headers', []) or table.get('header', [])
             rows = table.get('rows', [])
@@ -482,7 +484,7 @@ class EnhancedExtractionService:
         
         # CRITICAL: Normalize headers for GPT4o extractions
         if result.get('success') and result.get('tables'):
-            from app.services.extraction_utils import normalize_multi_line_headers
+            from app.services.extraction.extraction_utils import normalize_multi_line_headers
             for table in result.get('tables', []):
                 raw_headers = table.get('headers', []) or table.get('header', [])
                 rows = table.get('rows', [])
@@ -541,7 +543,7 @@ class EnhancedExtractionService:
         
         # CRITICAL: Normalize headers for DocAI extractions
         if result.get('success') and result.get('tables'):
-            from app.services.extraction_utils import normalize_multi_line_headers
+            from app.services.extraction.extraction_utils import normalize_multi_line_headers
             for table in result.get('tables', []):
                 raw_headers = table.get('headers', []) or table.get('header', [])
                 rows = table.get('rows', [])
@@ -694,7 +696,7 @@ class EnhancedExtractionService:
         
         # Apply table merging for identical headers
         if result.get('success') and result.get('tables'):
-            from app.services.extraction_utils import stitch_multipage_tables, normalize_multi_line_headers
+            from app.services.extraction.extraction_utils import stitch_multipage_tables, normalize_multi_line_headers
             original_tables = result.get('tables', [])
             merged_tables = stitch_multipage_tables(original_tables)
             
@@ -804,7 +806,7 @@ class EnhancedExtractionService:
             
             # Apply table merging if needed (for consistency with other extractors)
             if result.get('success') and result.get('tables'):
-                from app.services.extraction_utils import stitch_multipage_tables, normalize_multi_line_headers
+                from app.services.extraction.extraction_utils import stitch_multipage_tables, normalize_multi_line_headers
                 original_tables = result.get('tables', [])
                 merged_tables = stitch_multipage_tables(original_tables)
                 
