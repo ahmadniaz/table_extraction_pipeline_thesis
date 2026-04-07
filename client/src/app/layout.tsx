@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { SubmissionProvider } from "@/context/SubmissionContext";
-import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { Toaster } from "@/app/toast";
+import Navbar from "@/app/components/Navbar";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -13,8 +12,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Commission Tracker - Professional Financial Document Processing",
-  description: "Premium SaaS platform for commission tracking and financial document extraction with AI-powered processing",
+  title: "PDF Table Extraction Evaluator",
+  description: "Thesis tool for benchmarking table extraction accuracy across multiple AI and rule-based tools",
 };
 
 export default function RootLayout({
@@ -25,17 +24,16 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body
-        className={`${inter.variable} font-sans antialiased h-full bg-slate-50`}
+        className={`${inter.variable} font-sans antialiased h-full bg-slate-50 dark:bg-slate-900`}
         suppressHydrationWarning={true}
       >
         <ThemeProvider>
-          <AuthProvider>
-            <SubmissionProvider>
-              {children}
-            </SubmissionProvider>
-          </AuthProvider>
+          <div className="flex flex-col min-h-screen">
+            <Navbar />
+            <main className="flex-1">{children}</main>
+          </div>
+          <Toaster />
         </ThemeProvider>
-        <Toaster />
       </body>
     </html>
   );
