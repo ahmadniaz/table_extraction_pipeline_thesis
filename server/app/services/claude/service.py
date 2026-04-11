@@ -189,7 +189,8 @@ class ClaudeDocumentAIService:
             extraction_result = await self._call_claude_api(
                 pdf_base64,
                 metadata_prompt,
-                model=self.primary_model
+                model=self.primary_model,
+                use_structured_output=False,
             )
             
             # Parse response
@@ -433,6 +434,9 @@ class ClaudeDocumentAIService:
                 token_usage=extraction_result.get('usage', {}),
                 quality_metrics=quality_metrics
             )
+
+            # Attach real token counts so runner can use them for cost estimation
+            result['usage'] = extraction_result.get('usage', {})
             
             return result
         
@@ -622,20 +626,33 @@ class ClaudeDocumentAIService:
         pdf_base64: str,
         prompt: str,
         model: str,
-        max_retries: int = 3
+        max_retries: int = 3,
+        use_structured_output: bool = True,
     ) -> Dict[str, Any]:
         """
-        Call Claude API with retry logic
-        
+        Call Claude API with retry logic.
+
+        When use_structured_output=True (default for table extraction calls)
+        the API is invoked with tool-use forced to EXTRACTION_TOOL, which
+        guarantees that the model returns schema-valid JSON in block.input.
+        The result is serialised back to a JSON string so that the existing
+        ClaudeResponseParser.parse_json_response() path works unchanged.
+
+        When use_structured_output=False (metadata / summarize helpers) the
+        response is returned as plain text, exactly as before.
+
         Args:
             pdf_base64: Base64-encoded PDF
-            prompt: Extraction prompt
+            prompt: Extraction prompt (user message text)
             model: Claude model to use
             max_retries: Maximum retry attempts
+            use_structured_output: Whether to force tool-use structured output
             
         Returns:
             API response with content and usage
         """
+        from app.services.ai.shared_prompts import EXTRACTION_TOOL
+
         for attempt in range(max_retries):
             try:
                 # Prepare messages
@@ -658,62 +675,98 @@ class ClaudeDocumentAIService:
                         ]
                     }
                 ]
-                
+
+                # Build base API kwargs
+                api_kwargs: Dict[str, Any] = {
+                    "model": model,
+                    "max_tokens": 16000,
+                    "system": self.prompts.get_system_prompt(),
+                    "messages": messages,
+                }
+
+                if use_structured_output:
+                    # Force the model to call our extraction tool — this
+                    # guarantees schema-valid JSON every time with no JSON
+                    # parsing workarounds needed.
+                    api_kwargs["tools"] = [EXTRACTION_TOOL]
+                    api_kwargs["tool_choice"] = {
+                        "type": "tool",
+                        "name": EXTRACTION_TOOL["name"],
+                    }
+                else:
+                    # Free-text mode for metadata / summarize endpoints
+                    api_kwargs["temperature"] = 0.1
+
                 # Call API
-                logger.info(f"Calling Claude API with model: {model} (attempt {attempt + 1}/{max_retries})")
-                
+                logger.info(
+                    f"Calling Claude API with model: {model} "
+                    f"(attempt {attempt + 1}/{max_retries}, "
+                    f"structured_output={use_structured_output})"
+                )
+
                 response = await asyncio.wait_for(
-                    self.async_client.messages.create(
-                        model=model,
-                        max_tokens=16000,  # Large enough for comprehensive extraction
-                        temperature=0.1,  # Low temperature for consistency
-                        system=self.prompts.get_system_prompt(),
-                        messages=messages
-                    ),
+                    self.async_client.messages.create(**api_kwargs),
                     timeout=self.timeout_seconds
                 )
-                
-                # Extract content
-                content_blocks = response.content
+
+                # Extract content — prefer tool_use block for structured calls
                 content_text = ""
-                
-                for block in content_blocks:
-                    if hasattr(block, 'text'):
-                        content_text += block.text
-                    elif isinstance(block, dict) and 'text' in block:
-                        content_text += block['text']
-                
+
+                if use_structured_output:
+                    for block in response.content:
+                        block_type = getattr(block, "type", None)
+                        if block_type == "tool_use" and getattr(block, "name", None) == EXTRACTION_TOOL["name"]:
+                            # block.input is already a validated dict; serialise
+                            # to JSON string so parse_json_response works as-is.
+                            content_text = json.dumps(block.input)
+                            break
+                    # Safety fallback: use any text block if tool_use was absent
+                    if not content_text:
+                        logger.warning("Expected tool_use block not found; falling back to text")
+                        for block in response.content:
+                            if hasattr(block, "text"):
+                                content_text += block.text
+
+                else:
+                    for block in response.content:
+                        if hasattr(block, "text"):
+                            content_text += block.text
+                        elif isinstance(block, dict) and "text" in block:
+                            content_text += block["text"]
+
                 # Extract usage
-                usage = {}
-                if hasattr(response, 'usage'):
+                usage: Dict[str, Any] = {}
+                if hasattr(response, "usage"):
                     usage = {
-                        'input_tokens': getattr(response.usage, 'input_tokens', 0),
-                        'output_tokens': getattr(response.usage, 'output_tokens', 0)
+                        "input_tokens": getattr(response.usage, "input_tokens", 0),
+                        "output_tokens": getattr(response.usage, "output_tokens", 0),
                     }
-                    self.stats['total_tokens_used'] += usage.get('input_tokens', 0) + usage.get('output_tokens', 0)
-                
-                logger.info(f"✅ Claude API call successful. Tokens: {usage}")
-                
+                    self.stats["total_tokens_used"] += (
+                        usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+                    )
+
+                logger.info(f"Claude API call successful. Tokens: {usage}")
+
                 return {
-                    'content': content_text,
-                    'usage': usage,
-                    'model': model
+                    "content": content_text,
+                    "usage": usage,
+                    "model": model,
                 }
-            
+
             except asyncio.TimeoutError:
                 logger.warning(f"Claude API timeout (attempt {attempt + 1}/{max_retries})")
                 if attempt == max_retries - 1:
                     raise ValueError(f"Claude API timeout after {max_retries} attempts")
                 await asyncio.sleep(self.error_handler.get_retry_delay(attempt))
-            
+
             except Exception as e:
                 logger.error(f"Claude API error (attempt {attempt + 1}/{max_retries}): {e}")
-                
+
                 if not self.error_handler.is_retriable_error(e) or attempt == max_retries - 1:
                     raise
-                
+
                 await asyncio.sleep(self.error_handler.get_retry_delay(attempt))
-        
+
         raise ValueError(f"Claude API failed after {max_retries} attempts")
     
     def _merge_split_tables(self, tables: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -835,12 +888,12 @@ class ClaudeDocumentAIService:
             # Use the specific prompt for summarize extraction
             prompt = self.prompts.get_summarize_extraction_prompt()
             
-            # Use the same API call method as _extract_standard_file
             logger.info("Calling Claude API for summarize extraction")
             extraction_result = await self._call_claude_api(
                 pdf_base64,
                 prompt,
-                model=self.primary_model
+                model=self.primary_model,
+                use_structured_output=False,
             )
             
             # Extract content from the result

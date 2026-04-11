@@ -28,6 +28,10 @@ class GroundTruthTable(Base):
     rows = Column(JSON, nullable=False)
     annotated_at = Column(DateTime, server_default=text('now()'), nullable=False)
     notes = Column(Text, nullable=True)  # annotation edge-case notes
+    confirmed = Column(Boolean, nullable=False, default=False, server_default=text('false'))
+    source = Column(String, nullable=False, default='manual', server_default=text("'manual'"))
+    correction_log = Column(JSON, nullable=False, default=list, server_default=text("'[]'::json"))
+    correction_count = Column(Integer, nullable=False, default=0, server_default=text('0'))
 
 
 class ExtractionResult(Base):
@@ -42,6 +46,9 @@ class ExtractionResult(Base):
     cost_usd = Column(Numeric(10, 6))
     error_message = Column(Text, nullable=True)
     extracted_at = Column(DateTime, server_default=text('now()'), nullable=False)
+    failure_reason = Column(String, nullable=True)
+    is_transient_failure = Column(Boolean, nullable=False, default=False, server_default=text('false'))
+    raw_output = Column(JSON, nullable=True)
 
 
 class EvaluationScore(Base):

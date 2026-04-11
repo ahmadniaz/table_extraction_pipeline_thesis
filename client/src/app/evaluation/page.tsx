@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { Play, Loader2, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
-import ToolSelector, { ALL_TOOLS, type ToolId } from '@/app/components/evaluation/ToolSelector';
+import ToolSelector, { DEFAULT_SELECTED_TOOLS, type ToolId } from '@/app/components/evaluation/ToolSelector';
 import EvaluationProgressPanel from '@/app/components/evaluation/EvaluationProgressPanel';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
@@ -14,7 +14,7 @@ type Tier = 'all' | 'low' | 'medium' | 'high';
 interface Document { id: string; filename: string; complexity_tier: string; }
 
 export default function EvaluationPage() {
-  const [selectedTools, setSelectedTools] = useState<ToolId[]>(ALL_TOOLS.map(t => t.id));
+  const [selectedTools, setSelectedTools] = useState<ToolId[]>(DEFAULT_SELECTED_TOOLS);
   const [tier, setTier] = useState<Tier>('all');
   const [documents, setDocuments] = useState<Document[]>([]);
   const [docFilter, setDocFilter] = useState<'all' | string>('all');

@@ -1,23 +1,26 @@
 """
 Table extraction methods for Google Document AI.
+
+Uses the Form Parser table API exclusively as primary source of truth.
+header_rows / body_rows → extract_cell_text_with_confidence → document.text.
+All domain-specific heuristics (pattern analysis, confidence filtering for
+individual cells, company name enrichment) have been removed so that this
+tool is comparable to Textract, Docling, and PyMuPDF on equal footing.
 """
 
+import logging
 from typing import Any, List, Dict, Tuple
 from datetime import datetime
-from .config import (
-    HEADER_CONFIDENCE_THRESHOLD,
-    CELL_CONFIDENCE_THRESHOLD,
-    MIN_TABLE_WIDTH,
-    MIN_TABLE_HEIGHT
-)
-from .post_processing import PatternAnalyzer
+from .config import MIN_TABLE_WIDTH, MIN_TABLE_HEIGHT
+
+logger = logging.getLogger(__name__)
 
 
 class TableExtractor:
     """Handles table extraction from Google Document AI documents."""
-    
+
     def __init__(self):
-        self.pattern_analyzer = PatternAnalyzer()
+        pass
     
     def extract_tables_from_document(self, document: Any) -> List[Dict[str, Any]]:
         """
@@ -32,15 +35,12 @@ class TableExtractor:
         tables = []
         
         try:
-            # Extract tables from each page
             for page_num, page in enumerate(document.pages):
                 page_tables = self.extract_tables_from_page(page, page_num, document)
                 tables.extend(page_tables)
-            
             return tables
-            
-        except Exception as e:
-            print(f"Error extracting tables from document: {e}")
+        except Exception as exc:
+            logger.error("DocAI: error extracting tables from document: %s", exc)
             return []
     
     def extract_tables_from_page(
@@ -63,104 +63,106 @@ class TableExtractor:
         tables = []
         
         try:
-            # First, try to detect and process Form Parser format (tables structure)
+            # Form Parser tables are the primary source of truth.
             form_parser_tables = self.extract_form_parser_tables(page, page_num, document)
             if form_parser_tables:
                 tables.extend(form_parser_tables)
                 return tables
-            
-            # Fall back to traditional spatial clustering approach
-            table_blocks = [block for block in page.blocks if block.layout.text_anchor.text_segments]
-            
+
+            # True fallback: page.tables was empty — attempt spatial clustering
+            # against raw page blocks (last resort only).
+            try:
+                table_blocks = [
+                    b for b in page.blocks
+                    if b.layout.text_anchor.text_segments
+                ]
+            except Exception:
+                table_blocks = []
+
             for table_idx, table_block in enumerate(table_blocks):
                 try:
-                    # Extract table structure
                     table_data = self.extract_table_structure(table_block, page)
-                    
                     if table_data and table_data.get("rows"):
-                        # Add metadata
                         table_data.update({
                             "table_index": len(tables),
-                            "page_number": page_num + 1,
-                            "extractor": "google_docai",
-                            "confidence": self.calculate_table_confidence(table_block),
+                            "page_number": page_num,   # 0-based
+                            "extractor": "google_docai_spatial",
+                            "docai_confidence": self.calculate_table_confidence(table_block),
                             "metadata": {
-                                "page_number": page_num + 1,
+                                "page_number": page_num,
                                 "table_index": table_idx,
-                                "extraction_method": "google_docai",
-                                "timestamp": datetime.now().isoformat()
-                            }
+                                "extraction_method": "google_docai_spatial",
+                                "timestamp": datetime.now().isoformat(),
+                            },
                         })
-                        
                         tables.append(table_data)
-                
-                except Exception as e:
-                    print(f"Error extracting table {table_idx} from page {page_num}: {e}")
-                    continue
-            
+                except Exception as exc:
+                    logger.debug(
+                        "DocAI: spatial fallback table %d page %d: %s",
+                        table_idx, page_num, exc,
+                    )
+
             return tables
-            
-        except Exception as e:
-            print(f"Error extracting tables from page {page_num}: {e}")
+
+        except Exception as exc:
+            logger.error("DocAI: error extracting tables from page %d: %s", page_num, exc)
             return []
     
     def extract_form_parser_tables(
-        self, 
-        page: Any, 
-        page_num: int, 
-        document: Any
+        self,
+        page: Any,
+        page_num: int,
+        document: Any,
     ) -> List[Dict[str, Any]]:
         """
-        Extract tables using Document AI Form Parser format (tables structure).
-        
-        Args:
-            page: Document AI page
-            page_num: Page number
-            document: Document AI document
-            
-        Returns:
-            List of extracted tables in standard format
+        Extract tables from a page using the Document AI Form Parser table API.
+
+        Form Parser output is treated as ground truth.  A spatial-clustering
+        fallback is attempted ONLY when a specific table has no rows at all
+        (Form Parser detected a table region but could not parse its cells).
         """
-        tables = []
-        
-        try:
-            # Check if page has tables (Form Parser format)
-            if hasattr(page, 'tables') and page.tables:
-                for table_idx, table in enumerate(page.tables):
-                    try:
-                        # Convert Form Parser table to standard format
-                        table_data = self.convert_form_parser_table_to_standard_format(
-                            table, page_num, table_idx, document
-                        )
-                        
-                        if table_data and table_data.get("rows"):
-                            tables.append(table_data)
-                            print(f"✅ Successfully converted Form Parser table: {len(table_data.get('headers', []))} headers, {len(table_data.get('rows', []))} rows")
-                        else:
-                            # Fallback: Try to extract table from raw text using spatial analysis
-                            print(f"⚠️ Form Parser table {table_idx} has no rows, trying fallback extraction...")
-                            fallback_table = self.extract_table_from_raw_text(page, page_num, table_idx, document)
-                            if fallback_table and fallback_table.get("rows"):
-                                tables.append(fallback_table)
-                                print(f"✅ Fallback extraction successful: {len(fallback_table.get('headers', []))} headers, {len(fallback_table.get('rows', []))} rows")
-                    
-                    except Exception as e:
-                        print(f"Error extracting Form Parser table {table_idx} from page {page_num}: {e}")
-                        # Try fallback extraction
-                        try:
-                            fallback_table = self.extract_table_from_raw_text(page, page_num, table_idx, document)
-                            if fallback_table and fallback_table.get("rows"):
-                                tables.append(fallback_table)
-                                print(f"✅ Fallback extraction successful after error: {len(fallback_table.get('headers', []))} headers, {len(fallback_table.get('rows', []))} rows")
-                        except Exception as fallback_error:
-                            print(f"Fallback extraction also failed: {fallback_error}")
-                        continue
-            
+        tables: List[Dict[str, Any]] = []
+
+        if not (hasattr(page, "tables") and page.tables):
             return tables
-            
-        except Exception as e:
-            print(f"Error extracting Form Parser tables from page {page_num}: {e}")
-            return []
+
+        for table_idx, table in enumerate(page.tables):
+            try:
+                table_data = self.convert_form_parser_table_to_standard_format(
+                    table, page_num, table_idx, document
+                )
+
+                if table_data.get("rows"):
+                    tables.append(table_data)
+                else:
+                    # Form Parser returned a table block but no parseable rows —
+                    # attempt a raw-text spatial fallback for this region only.
+                    logger.debug(
+                        "DocAI: Form Parser table %d on page %d has no rows — "
+                        "attempting spatial fallback",
+                        table_idx, page_num,
+                    )
+                    fallback = self.extract_table_from_raw_text(
+                        page, page_num, table_idx, document
+                    )
+                    if fallback and fallback.get("rows"):
+                        tables.append(fallback)
+
+            except Exception as exc:
+                logger.warning(
+                    "DocAI: error on Form Parser table %d page %d: %s",
+                    table_idx, page_num, exc,
+                )
+                try:
+                    fallback = self.extract_table_from_raw_text(
+                        page, page_num, table_idx, document
+                    )
+                    if fallback and fallback.get("rows"):
+                        tables.append(fallback)
+                except Exception:
+                    pass
+
+        return tables
 
     def extract_text_from_text_anchor(self, text_anchor: Any, document: Any) -> str:
         """
@@ -186,8 +188,8 @@ class TableExtractor:
                         text_parts.append(document.text[start_idx:end_idx])
             
             return " ".join(text_parts).strip()
-        except Exception as e:
-            print(f"Error extracting text from text anchor: {e}")
+        except Exception as exc:
+            logger.debug("DocAI: error extracting text from text anchor: %s", exc)
             return ""
 
     def extract_table_from_raw_text(
@@ -236,20 +238,20 @@ class TableExtractor:
                             })
             
             if not text_blocks:
-                return {"header": [], "rows": [], "confidence": 0.0}
-            
+                return {"headers": [], "rows": [], "docai_confidence": 0.0}
+
             # Sort text blocks by vertical position (top to bottom)
-            text_blocks.sort(key=lambda x: x['bbox']['y'] if x['bbox'] else 0)
-            
+            text_blocks.sort(key=lambda x: x["bbox"]["y"] if x["bbox"] else 0)
+
             # Group text blocks into rows based on vertical proximity
             rows = []
-            current_row = []
+            current_row: List[Dict] = []
             last_y = None
-            
+
             for block in text_blocks:
-                if block['bbox']:
-                    current_y = block['bbox']['y']
-                    if last_y is None or abs(current_y - last_y) < 20:  # 20px tolerance
+                if block["bbox"]:
+                    current_y = block["bbox"]["y"]
+                    if last_y is None or abs(current_y - last_y) < 20:
                         current_row.append(block)
                     else:
                         if current_row:
@@ -258,53 +260,52 @@ class TableExtractor:
                     last_y = current_y
                 else:
                     current_row.append(block)
-            
+
             if current_row:
                 rows.append(current_row)
-            
-            # Extract headers from first row
-            headers = []
+
+            # First row → headers; remainder → data
+            headers: List[str] = []
             if rows:
-                header_blocks = rows[0]
-                headers = [block['text'] for block in header_blocks]
-                rows = rows[1:]  # Remove header row from data rows
-            
-            # Extract data rows
-            data_rows = []
+                headers = [block["text"] for block in rows[0]]
+                rows = rows[1:]
+
+            data_rows: List[List[str]] = []
             for row_blocks in rows:
-                row_data = [block['text'] for block in row_blocks]
-                if any(cell.strip() for cell in row_data):  # Only add non-empty rows
+                row_data = [block["text"] for block in row_blocks]
+                if any(cell.strip() for cell in row_data):
                     data_rows.append(row_data)
-            
-            # Normalize row lengths
+
+            # Normalise row lengths
             if headers:
                 max_cols = len(headers)
-                normalized_rows = []
-                for row in data_rows:
-                    normalized_row = row[:max_cols] + [""] * (max_cols - len(row))
-                    normalized_rows.append(normalized_row)
-                data_rows = normalized_rows
-            
+                data_rows = [
+                    row[:max_cols] + [""] * (max_cols - len(row))
+                    for row in data_rows
+                ]
+
             return {
-                "header": headers,
+                "headers": headers,
                 "rows": data_rows,
-                "confidence": 0.5,  # Lower confidence for fallback method
+                "docai_confidence": 0.5,   # lower confidence for spatial fallback
                 "bbox": {},
-                "page_number": page_num + 1,
+                "page_number": page_num,   # 0-based
                 "table_index": table_idx,
+                "row_count": len(data_rows),
+                "col_count": len(headers),
                 "extractor": "google_docai_fallback",
                 "metadata": {
-                    "page_number": page_num + 1,
+                    "page_number": page_num,
                     "table_index": table_idx,
                     "extraction_method": "google_docai_fallback",
                     "timestamp": datetime.now().isoformat(),
-                    "source_format": "raw_text_analysis"
-                }
+                    "source_format": "raw_text_analysis",
+                },
             }
-            
-        except Exception as e:
-            print(f"Error in fallback table extraction: {e}")
-            return {"header": [], "rows": [], "confidence": 0.0}
+
+        except Exception as exc:
+            logger.warning("DocAI: fallback extraction failed on page %d: %s", page_num, exc)
+            return {"headers": [], "rows": [], "docai_confidence": 0.0}
     
     def extract_cell_text_with_confidence(
         self, 
@@ -334,8 +335,8 @@ class TableExtractor:
             
             return text, confidence
             
-        except Exception as e:
-            print(f"Error extracting cell text with confidence: {e}")
+        except Exception as exc:
+            logger.debug("DocAI: error extracting cell text: %s", exc)
             return "", 0.0
 
     def extract_cell_text(self, cell: Any, document: Any) -> str:
@@ -412,153 +413,141 @@ class TableExtractor:
             return ""
 
     def convert_form_parser_table_to_standard_format(
-        self, 
-        table: Any, 
-        page_num: int, 
-        table_index: int, 
-        document: Any = None
+        self,
+        table: Any,
+        page_num: int,
+        table_index: int,
+        document: Any = None,
     ) -> Dict[str, Any]:
         """
-        Convert a Document AI Form Parser table to standard format with enhanced header detection.
-        
+        Convert a Document AI Form Parser table to the standard {headers, rows} format.
+
+        Header strategy (per Google Form Parser samples):
+          - If table.header_rows is non-empty: use the LAST header row as column names.
+          - If table.header_rows is empty but body_rows exist: synthesise Column_1…N names.
+
+        No confidence thresholds are applied to individual cells — cell text is used
+        as-is. This keeps the tool output directly comparable to Textract and Docling.
+
         Args:
-            table: Document AI Form Parser table object
-            page_num: Page number where the table was found
-            table_index: Index of the table on the page
-            document: Document AI document object
-            
+            table:       Document AI Form Parser table object (Page.Table).
+            page_num:    0-based page index.
+            table_index: Position of this table on the page.
+            document:    Document AI document object (for text_anchor resolution).
+
         Returns:
-            Standard table dictionary with headers, rows, and metadata
+            {
+                "headers": list[str],
+                "rows":    list[list[str]],
+                "docai_confidence": float,
+                "bbox":    dict,
+                "page_number":  int,   # 0-based
+                "table_index":  int,
+                "row_count":    int,
+                "col_count":    int,
+                "extractor":    str,
+                "metadata":     dict,
+            }
         """
         try:
-            headers = []
-            rows = []
-            header_confidence_scores = []
-            
-            # Enhanced header extraction with confidence scoring
-            if hasattr(table, 'header_rows') and table.header_rows:
+            # ── Extract header rows ──────────────────────────────────────────
+            headers: List[str] = []
+            if hasattr(table, "header_rows") and table.header_rows:
+                header_rows_text: List[List[str]] = []
                 for header_row in table.header_rows:
                     row_cells = []
-                    row_confidence = []
                     for cell in header_row.cells:
-                        cell_text, confidence = self.extract_cell_text_with_confidence(cell, document)
-                        row_cells.append(cell_text)
-                        row_confidence.append(confidence)
+                        text, _ = self.extract_cell_text_with_confidence(cell, document)
+                        row_cells.append(text.strip())
                     if row_cells:
-                        headers.extend(row_cells)
-                        header_confidence_scores.extend(row_confidence)
-                        print(f"🔍 Header row extracted: {row_cells} with confidence: {row_confidence}")
-            
-            # Extract body rows with confidence tracking
-            if hasattr(table, 'body_rows') and table.body_rows:
+                        header_rows_text.append(row_cells)
+                # Use the LAST header row as column names (Google samples pattern)
+                if header_rows_text:
+                    headers = header_rows_text[-1]
+
+            # ── Extract body rows ────────────────────────────────────────────
+            rows: List[List[str]] = []
+            if hasattr(table, "body_rows") and table.body_rows:
+                # Synthesise Column_N headers from first body row when no header_rows exist
+                if not headers:
+                    first_body = table.body_rows[0]
+                    headers = [f"Column_{i + 1}" for i in range(len(first_body.cells))]
+
                 for body_row in table.body_rows:
                     row_cells = []
                     for cell in body_row.cells:
-                        cell_text, confidence = self.extract_cell_text_with_confidence(cell, document)
-                        # Only include cells with sufficient confidence
-                        if confidence >= CELL_CONFIDENCE_THRESHOLD:
-                            row_cells.append(cell_text)
-                        else:
-                            # Try alternative text extraction for low-confidence cells
-                            alt_text = self.extract_alternative_text(cell, document)
-                            row_cells.append(alt_text if alt_text else cell_text)
-                    if row_cells:
+                        text, _ = self.extract_cell_text_with_confidence(cell, document)
+                        row_cells.append(text.strip())
+                    if any(c for c in row_cells):
                         rows.append(row_cells)
-            
-            # Enhanced header detection with fallback mechanisms
-            if not headers and rows:
-                print("⚠️ No headers detected, using first row as headers")
-                headers = rows[0]
-                rows = rows[1:]
-                header_confidence_scores = [0.5] * len(headers)  # Default confidence for inferred headers
-            
-            # Filter low-confidence headers and generate alternatives
-            if headers and header_confidence_scores:
-                print(f"🔍 Processing {len(headers)} headers with confidence scores: {header_confidence_scores}")
-                filtered_headers = []
-                for i, (header, confidence) in enumerate(zip(headers, header_confidence_scores)):
-                    if confidence >= HEADER_CONFIDENCE_THRESHOLD:
-                        filtered_headers.append(header)
-                        print(f"✅ Header '{header}' (confidence: {confidence:.2f}) accepted")
-                    else:
-                        # Generate alternative header for low-confidence cells
-                        alt_header = self.pattern_analyzer.generate_header_from_data(rows, i) if rows else f"Column_{i+1}"
-                        filtered_headers.append(header)  # Keep original header even if low confidence
-                        print(f"🔄 Low confidence header '{header}' (confidence: {confidence:.2f}) kept as is")
-                headers = filtered_headers
-                print(f"📋 Final headers: {headers}")
-            else:
-                print(f"⚠️ No headers or confidence scores: headers={len(headers) if headers else 0}, confidence_scores={len(header_confidence_scores) if header_confidence_scores else 0}")
-            
-            # Ensure all rows have the same number of columns as headers
+
+            # ── Normalise row lengths to header count ────────────────────────
             if headers:
                 max_cols = len(headers)
-                normalized_rows = []
-                for row in rows:
-                    # Pad with empty strings if row has fewer columns
-                    normalized_row = row[:max_cols] + [""] * (max_cols - len(row))
-                    normalized_rows.append(normalized_row)
-                rows = normalized_rows
-            
-            # Generate default headers if none were detected
-            if not headers and rows:
-                max_cols = max(len(row) for row in rows) if rows else 0
-                headers = [f"Column_{i+1}" for i in range(max_cols)]
-                print(f"📋 Generated default headers: {headers}")
-            
-            # Extract metadata
-            confidence = getattr(table, 'confidence', 0.0)
-            bbox = {}
-            if hasattr(table, 'layout') and hasattr(table.layout, 'bounding_poly'):
-                vertices = table.layout.bounding_poly.vertices
-                if len(vertices) >= 4:
-                    bbox = {
-                        "x0": vertices[0].x,
-                        "y0": vertices[0].y,
-                        "x1": vertices[2].x,
-                        "y1": vertices[2].y
-                    }
-            
-            # Create standard table format
-            print(f"📊 Creating table with {len(headers)} headers and {len(rows)} rows")
-            print(f"📋 Headers: {headers}")
-            table_dict = {
-                "header": headers,
-                "rows": rows,
-                "confidence": confidence,
-                "bbox": bbox,
-                "page_number": page_num + 1,
-                "table_index": table_index,
-                "extractor": "google_docai_form_parser",
-                "metadata": {
-                    "page_number": page_num + 1,
-                    "table_index": table_index,
-                    "extraction_method": "google_docai_form_parser",
-                    "timestamp": datetime.now().isoformat(),
-                    "source_format": "form_parser_table"
-                }
-            }
-            print(f"✅ Table created with header field: {table_dict.get('header', [])}")
-            
-            return table_dict
-            
-        except Exception as e:
-            print(f"Error converting Form Parser table to standard format: {e}")
+                rows = [
+                    row[:max_cols] + [""] * (max_cols - len(row))
+                    for row in rows
+                ]
+
+            logger.debug(
+                "DocAI: page=%d table=%d headers=%d rows=%d",
+                page_num, table_index, len(headers), len(rows),
+            )
+
+            # ── Confidence ───────────────────────────────────────────────────
+            confidence = float(getattr(table, "confidence", 0.0))
+
+            # ── Bounding box ─────────────────────────────────────────────────
+            bbox: Dict[str, Any] = {}
+            try:
+                if hasattr(table, "layout") and table.layout.bounding_poly.vertices:
+                    v = table.layout.bounding_poly.vertices
+                    if len(v) >= 4:
+                        bbox = {"x0": v[0].x, "y0": v[0].y, "x1": v[2].x, "y1": v[2].y}
+            except Exception:
+                pass
+
             return {
-                "header": [],
-                "rows": [],
-                "confidence": 0.0,
-                "bbox": {},
-                "page_number": page_num + 1,
+                "headers": headers,
+                "rows": rows,
+                "docai_confidence": confidence,
+                "bbox": bbox,
+                "page_number": page_num,   # 0-based
                 "table_index": table_index,
+                "row_count": len(rows),
+                "col_count": len(headers),
                 "extractor": "google_docai_form_parser",
                 "metadata": {
-                    "page_number": page_num + 1,
+                    "page_number": page_num,
                     "table_index": table_index,
                     "extraction_method": "google_docai_form_parser",
                     "timestamp": datetime.now().isoformat(),
-                    "error": str(e)
-                }
+                    "source_format": "form_parser_table",
+                },
+            }
+
+        except Exception as exc:
+            logger.warning(
+                "DocAI: failed to convert Form Parser table %d on page %d: %s",
+                table_index, page_num, exc,
+            )
+            return {
+                "headers": [],
+                "rows": [],
+                "docai_confidence": 0.0,
+                "bbox": {},
+                "page_number": page_num,
+                "table_index": table_index,
+                "row_count": 0,
+                "col_count": 0,
+                "extractor": "google_docai_form_parser",
+                "metadata": {
+                    "page_number": page_num,
+                    "table_index": table_index,
+                    "extraction_method": "google_docai_form_parser",
+                    "timestamp": datetime.now().isoformat(),
+                    "error": str(exc),
+                },
             }
 
     def extract_table_structure(self, table_block: Any, page: Any) -> Dict[str, Any]:
@@ -642,20 +631,20 @@ class TableExtractor:
                 table_rows.append([cell.get("text", "") for cell in row])
             
             return {
-                "header": headers,
+                "headers": headers,
                 "rows": table_rows,
-                "confidence": layout.confidence,
+                "docai_confidence": float(getattr(layout, "confidence", 0.0)),
                 "bbox": {
                     "x0": bbox[0].x,
                     "y0": bbox[0].y,
                     "x1": bbox[2].x,
-                    "y1": bbox[2].y
-                }
+                    "y1": bbox[2].y,
+                },
             }
-            
-        except Exception as e:
-            print(f"Error analyzing table structure: {e}")
-            return {"header": [], "rows": [], "confidence": 0.0}
+
+        except Exception as exc:
+            logger.debug("DocAI: analyze_table_structure error: %s", exc)
+            return {"headers": [], "rows": [], "docai_confidence": 0.0}
     
     def cluster_table_elements(
         self, 

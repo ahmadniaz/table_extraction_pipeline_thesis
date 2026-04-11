@@ -1,13 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Trash2, Eye, Edit3, FileText, Loader2 } from 'lucide-react';
+import { Trash2, Eye, Edit3, FileText, Loader2, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import TierBadge from './TierBadge';
 import GroundTruthModal from './GroundTruthModal';
-import GroundTruthEditor from './GroundTruthEditor';
-
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 export interface Document {
@@ -17,18 +15,33 @@ export interface Document {
   is_digital: boolean | null;
   complexity_tier: 'low' | 'medium' | 'high';
   uploaded_at: string;
-  ground_truth_count?: number;
 }
+
+export type GtMeta =
+  | { status: 'none' }
+  | { status: 'confirmed'; n: number }
+  | { status: 'unconfirmed'; n: number };
+
+export type RowSeedState = 'seeding' | 'claude_unavailable' | 'no_tables' | 'seed_failed';
 
 interface Props {
   documents: Document[];
-  groundTruthCounts: Record<string, number>;
+  gtMeta: Record<string, GtMeta>;
+  rowSeed: Record<string, RowSeedState>;
   onRefresh: () => void;
+  onRetrySeed: (doc: Document) => void | Promise<void>;
+  onOpenEditor: (doc: Document) => void;
 }
 
-export default function DocumentTable({ documents, groundTruthCounts, onRefresh }: Props) {
+export default function DocumentTable({
+  documents,
+  gtMeta,
+  rowSeed,
+  onRefresh,
+  onRetrySeed,
+  onOpenEditor,
+}: Props) {
   const [viewGT, setViewGT] = useState<Document | null>(null);
-  const [editGT, setEditGT] = useState<Document | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
   const [updatingTier, setUpdatingTier] = useState<string | null>(null);
@@ -57,6 +70,79 @@ export default function DocumentTable({ documents, groundTruthCounts, onRefresh 
     } finally {
       setDeleting(null);
     }
+  };
+
+  const renderGtBadge = (doc: Document) => {
+    const seed = rowSeed[doc.id];
+    const meta = gtMeta[doc.id] ?? { status: 'none' as const };
+
+    if (seed === 'seeding') {
+      return (
+        <div className="flex flex-col items-center gap-1">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+            <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+            Seeding…
+          </span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center max-w-[200px] leading-tight">
+            Extracting with Claude… (this may take 30–60 seconds)
+          </span>
+        </div>
+      );
+    }
+
+    if (seed === 'claude_unavailable') {
+      return (
+        <div className="flex flex-col items-center gap-1 max-w-[220px]">
+          <span className="text-[10px] text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1 leading-snug text-left">
+            Claude is temporarily unavailable. You can manually add ground truth using the edit button when ready.
+          </span>
+        </div>
+      );
+    }
+
+    if (seed === 'no_tables') {
+      return (
+        <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+          No tables found by Claude
+        </span>
+      );
+    }
+
+    if (seed === 'seed_failed') {
+      return (
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-xs font-medium px-2 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200">
+            Seed Failed
+          </span>
+          <button
+            type="button"
+            onClick={() => onRetrySeed(doc)}
+            className="text-[10px] flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Retry
+          </button>
+        </div>
+      );
+    }
+
+    if (meta.status === 'none') {
+      return <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">None</span>;
+    }
+
+    if (meta.status === 'confirmed') {
+      return (
+        <span className="text-xs font-medium px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+          Confirmed ({meta.n} tables)
+        </span>
+      );
+    }
+
+    return (
+      <span className="text-xs font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+        Unconfirmed ({meta.n} tables)
+      </span>
+    );
   };
 
   if (documents.length === 0) {
@@ -88,11 +174,13 @@ export default function DocumentTable({ documents, groundTruthCounts, onRefresh 
                 key={doc.id}
                 className={`border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${i === 0 ? 'border-t-0' : ''}`}
               >
-                {/* Filename */}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-xs" title={doc.filename}>
+                    <span
+                      className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-xs"
+                      title={doc.filename}
+                    >
                       {doc.filename}
                     </span>
                   </div>
@@ -101,25 +189,24 @@ export default function DocumentTable({ documents, groundTruthCounts, onRefresh 
                   </div>
                 </td>
 
-                {/* Pages */}
                 <td className="px-4 py-3 text-center text-slate-600 dark:text-slate-400">
                   {doc.page_count ?? '—'}
                 </td>
 
-                {/* Type */}
                 <td className="px-4 py-3 text-center">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                    doc.is_digital === true
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                      : doc.is_digital === false
-                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-                      : 'bg-slate-100 text-slate-500'
-                  }`}>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded ${
+                      doc.is_digital === true
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                        : doc.is_digital === false
+                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                          : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
                     {doc.is_digital === true ? 'Digital' : doc.is_digital === false ? 'Scanned' : '—'}
                   </span>
                 </td>
 
-                {/* Tier */}
                 <td className="px-4 py-3 text-center">
                   <div className="flex items-center justify-center gap-1.5">
                     <TierBadge tier={doc.complexity_tier} />
@@ -139,25 +226,12 @@ export default function DocumentTable({ documents, groundTruthCounts, onRefresh 
                   </div>
                 </td>
 
-                {/* Ground Truth */}
-                <td className="px-4 py-3 text-center">
-                  {groundTruthCounts[doc.id] != null ? (
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                      groundTruthCounts[doc.id] > 0
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                    }`}>
-                      {groundTruthCounts[doc.id] > 0 ? `${groundTruthCounts[doc.id]} table${groundTruthCounts[doc.id] !== 1 ? 's' : ''}` : 'None'}
-                    </span>
-                  ) : (
-                    <span className="text-slate-300 text-xs">—</span>
-                  )}
-                </td>
+                <td className="px-4 py-3 text-center align-middle">{renderGtBadge(doc)}</td>
 
-                {/* Actions */}
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-center gap-1">
                     <button
+                      type="button"
                       onClick={() => setViewGT(doc)}
                       title="View ground truth"
                       className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600 transition-colors"
@@ -165,13 +239,15 @@ export default function DocumentTable({ documents, groundTruthCounts, onRefresh 
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => setEditGT(doc)}
+                      type="button"
+                      onClick={() => onOpenEditor(doc)}
                       title="Edit ground truth"
                       className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600 transition-colors"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button
+                      type="button"
                       onClick={() => setConfirmDelete(doc)}
                       disabled={deleting === doc.id}
                       title="Delete document"
@@ -187,37 +263,28 @@ export default function DocumentTable({ documents, groundTruthCounts, onRefresh 
         </table>
       </div>
 
-      {/* View Ground Truth */}
       {viewGT && (
         <GroundTruthModal docId={viewGT.id} filename={viewGT.filename} onClose={() => setViewGT(null)} />
       )}
 
-      {/* Edit Ground Truth */}
-      {editGT && (
-        <GroundTruthEditor
-          docId={editGT.id}
-          filename={editGT.filename}
-          onClose={() => setEditGT(null)}
-          onSaved={onRefresh}
-        />
-      )}
-
-      {/* Confirm delete modal */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
             <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">Delete document?</h3>
             <p className="text-sm text-slate-500">
-              This will permanently delete <strong>{confirmDelete.filename}</strong> and all associated ground truth and evaluation results.
+              This will permanently delete <strong>{confirmDelete.filename}</strong> and all associated ground truth and
+              evaluation results.
             </p>
             <div className="flex gap-3 justify-end">
               <button
+                type="button"
                 onClick={() => setConfirmDelete(null)}
                 className="px-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={() => handleDelete(confirmDelete)}
                 className="px-4 py-2 text-sm rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition-colors"
               >

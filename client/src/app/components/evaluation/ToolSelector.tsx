@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 export const ALL_TOOLS = [
   { id: 'pymupdf',       label: 'PyMuPDF',        description: 'Rule-based PDF text extraction' },
   { id: 'docling',       label: 'Docling',         description: 'Microsoft Table Transformer + OCR' },
+  { id: 'aws_textract',  label: 'AWS Textract',    description: 'Amazon Textract AnalyzeDocument (TABLES)' },
   { id: 'google_docai',  label: 'Google DocAI',    description: 'Google Document AI Form Parser' },
   { id: 'gpt5',          label: 'GPT-5 Vision',    description: 'OpenAI multimodal extraction' },
   { id: 'claude_sonnet', label: 'Claude Sonnet',   description: 'Anthropic claude-sonnet-4' },
@@ -12,6 +13,13 @@ export const ALL_TOOLS = [
 ] as const;
 
 export type ToolId = typeof ALL_TOOLS[number]['id'];
+
+/**
+ * Initial tool selection on the batch evaluation page.
+ * Keep aligned with server DEFAULT_EXTRACTION_TOOL (default pymupdf) for local testing.
+ * Revert to e.g. ['claude_sonnet'] or ALL_TOOLS.map(t => t.id) when switching back.
+ */
+export const DEFAULT_SELECTED_TOOLS: ToolId[] = ['pymupdf'];
 
 interface Props {
   selected: ToolId[];

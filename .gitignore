@@ -25,5 +25,8 @@ server/pdf-tables-extractor-*.json
 # Don't exclude all JSON files, only credentials
 # *.json
 
+# Local / deploy hints — do not put tokens here (GitHub push protection flags PATs)
+runtime.txt
+
 # General
 *.log

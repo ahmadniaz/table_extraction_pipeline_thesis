@@ -101,3 +101,41 @@ class EnhancedCommissionDocument(BaseModel):
     total_tables: int = Field(description="Total number of tables found")
     extraction_confidence: str = Field(default="0.9", description="Confidence score for the extraction")
     processing_metadata: Dict[str, Any] = Field(default_factory=dict, description="Processing metadata and insights")
+
+
+class SharedBenchmarkDocumentMetadata(BaseModel):
+    """
+    Document-level fields aligned with app.services.ai.shared_prompts.EXTRACTION_SCHEMA.
+
+    Used with Mistral chat.parse so structured output matches the GPT-5 / Claude
+    benchmark contract (carrier, statement date, broker only — no enrichment).
+    """
+
+    carrier_name: Optional[str] = Field(default=None, description="Insurance carrier as shown on the document")
+    statement_date: Optional[str] = Field(default=None, description="Statement / reporting date (YYYY-MM-DD when possible)")
+    broker_company: Optional[str] = Field(default=None, description="Broker or agency receiving commissions")
+
+
+class SharedBenchmarkTable(BaseModel):
+    """One extracted table — same shape as shared JSON schema table items."""
+
+    headers: List[str] = Field(default_factory=list, description="Column headers left-to-right")
+    rows: List[List[str]] = Field(default_factory=list, description="Data rows")
+    page_number: Optional[int] = Field(default=None, description="1-based page index where the table appears")
+    table_type: Optional[str] = Field(default=None, description="Short label e.g. commission_table")
+    confidence_score: Optional[float] = Field(default=None, description="Model confidence 0.0–1.0")
+
+
+class SharedBenchmarkDocument(BaseModel):
+    """
+    Full extraction payload for the thesis benchmark path.
+
+    Mirrors shared_prompts.EXTRACTION_SCHEMA for use with
+    response_format_from_pydantic_model(...) on Mistral chat.parse.
+    """
+
+    tables: List[SharedBenchmarkTable] = Field(default_factory=list)
+    document_metadata: SharedBenchmarkDocumentMetadata = Field(
+        default_factory=SharedBenchmarkDocumentMetadata
+    )
+    extraction_notes: Optional[str] = Field(default=None, description="Optional ambiguity note")

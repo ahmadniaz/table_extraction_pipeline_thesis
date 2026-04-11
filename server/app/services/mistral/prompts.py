@@ -1,14 +1,40 @@
 """
 System prompts for Mistral Document AI service.
 
-This module contains all the intelligent prompts used for different
-phases of document extraction.
+get_system_prompt() and get_table_extraction_prompt() delegate to
+shared_prompts to keep all three LLM tools (Claude, GPT-5, Mistral)
+on the same extraction contract for fair thesis benchmarking.
+
+The document-intelligence and table-structure prompts used by the
+multi-phase intelligent path remain Mistral-specific and are unchanged.
 """
+
+from app.services.ai.shared_prompts import SYSTEM_PROMPT, USER_PROMPT
 
 
 class MistralPrompts:
     """Collection of system prompts for intelligent document extraction"""
-    
+
+    # ── Shared benchmark prompts ──────────────────────────────────────────────
+
+    @staticmethod
+    def get_system_prompt() -> str:
+        """
+        Universal system prompt shared with Claude and GPT-5.
+        Used for any direct chat/vision call in the Mistral pipeline.
+        """
+        return SYSTEM_PROMPT
+
+    @staticmethod
+    def get_table_extraction_prompt() -> str:
+        """
+        Universal user prompt shared with Claude and GPT-5.
+        Used alongside document content in direct extraction calls.
+        """
+        return USER_PROMPT
+
+    # ── Mistral-specific multi-phase prompts ──────────────────────────────────
+
     @staticmethod
     def get_document_intelligence_prompt() -> str:
         """Create intelligent system prompt for Phase 1A: Document Intelligence Analysis"""

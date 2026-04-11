@@ -9,36 +9,49 @@ import { cn } from '@/lib/utils';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
+export interface UploadedDocumentPayload {
+  id: string;
+  filename: string;
+  complexity_tier: string;
+  page_count: number | null;
+  is_digital: boolean | null;
+  uploaded_at: string;
+}
+
 interface Props {
-  onUploaded: () => void;
+  onUploaded: (doc: UploadedDocumentPayload) => void | Promise<void>;
 }
 
 export default function DocumentUploadZone({ onUploaded }: Props) {
   const [uploading, setUploading] = useState(false);
 
-  const onDrop = useCallback(async (files: File[]) => {
-    const file = files[0];
-    if (!file) return;
+  const onDrop = useCallback(
+    async (files: File[]) => {
+      const file = files[0];
+      if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      toast.error('Only PDF files are accepted');
-      return;
-    }
+      if (!file.name.toLowerCase().endsWith('.pdf')) {
+        toast.error('Only PDF files are accepted');
+        return;
+      }
 
-    setUploading(true);
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('complexity_tier', 'medium');
-      await axios.post(`${API}/api/documents/upload`, form);
-      toast.success(`Uploaded "${file.name}"`);
-      onUploaded();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? 'Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  }, [onUploaded]);
+      setUploading(true);
+      try {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('complexity_tier', 'medium');
+        const { data } = await axios.post<UploadedDocumentPayload>(`${API}/api/documents/upload`, form);
+        toast.success(`Uploaded "${file.name}"`);
+        await onUploaded(data);
+      } catch (err: unknown) {
+        const ax = err as { response?: { data?: { detail?: string } } };
+        toast.error(ax?.response?.data?.detail ?? 'Upload failed');
+      } finally {
+        setUploading(false);
+      }
+    },
+    [onUploaded]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

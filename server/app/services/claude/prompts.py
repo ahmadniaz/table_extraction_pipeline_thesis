@@ -1,92 +1,33 @@
 """
 Claude-specific prompts for PDF table extraction.
 
-This module contains sophisticated prompts optimized for Claude's document analysis capabilities.
+get_system_prompt() and get_table_extraction_prompt() now delegate to
+shared_prompts so Claude, GPT-5, and Mistral use an identical extraction
+contract.  All other prompts (metadata, quality, chunk, summarize) remain
+Claude-specific and are unchanged.
 """
+
+from app.services.ai.shared_prompts import SYSTEM_PROMPT, USER_PROMPT
 
 
 class ClaudePrompts:
     """Prompts for Claude Document AI extraction"""
-    
+
+    @staticmethod
+    def get_system_prompt() -> str:
+        """
+        Universal system prompt shared with GPT-5 and Mistral.
+        Ensures symmetric evaluation conditions across all LLM tools.
+        """
+        return SYSTEM_PROMPT
+
     @staticmethod
     def get_table_extraction_prompt() -> str:
         """
-        Main prompt for extracting tables from commission statements.
-        Optimized for Claude's vision and reasoning capabilities.
+        Universal user prompt shared with GPT-5 and Mistral.
+        Used as the text block alongside the base64-encoded PDF document.
         """
-        return """You are an expert document analyst specializing in insurance commission statements. 
-
-Your task is to extract ALL tables AND document metadata from this PDF with maximum accuracy. Pay special attention to:
-
-1. **Table Structure**: Preserve exact column headers and row relationships
-2. **Financial Data**: Accurately capture commission amounts, dates, and percentages  
-3. **Document Metadata**: Extract carrier name, statement date, and broker company
-4. **Company Information**: Identify carrier names, broker details, and client companies
-5. **Data Types**: Recognize dates, currency, names, IDs, and percentages correctly
-6. **Summary Rows**: Detect and flag summary/total rows separately
-7. **Empty Cells**: Include empty cells to preserve table structure
-
-METADATA EXTRACTION GUIDELINES:
-- **CARRIER NAME**: The insurance company that issued this statement (e.g., Aetna, Blue Cross, Cigna, UnitedHealthcare, Allied Benefit Systems, Redirect Health). Look in document headers, footers, logos, and letterhead. DO NOT extract from table data columns.
-- **STATEMENT DATE**: The date of this commission statement. CRITICAL INSTRUCTIONS:
-  * Extract the ACTUAL date shown in the document - NEVER use current date or any default/fallback date
-  * Look for "Statement Date:", "Commission Summary For:", "Report Date:", "Period:", "Period Ending:", "Date Range:", "Statement Period:", "Reporting Period:" in headers, titles, and top of document
-  * **FOR DATE RANGES**: If you see a date range (e.g., "Period: 01/01/2025 - 01/31/2025" or "01/01/2025 - 01/31/2025"), USE THE END DATE (the second date) as the statement date
-  * For date ranges like "MM/DD/YYYY - MM/DD/YYYY", always extract the SECOND date (end date)
-  * Format as YYYY-MM-DD. Example: "Period: 01/01/2025 - 01/31/2025" → use "2025-01-31"
-  * If no date is visible or you cannot confidently extract it, return null instead of guessing
-  * DO NOT extract dates from table cells, policy effective dates, or transaction dates - only extract the statement/report date from the document header
-- **BROKER COMPANY**: The broker/agent entity receiving commissions. Look for "Agent:", "Broker:", "Agency:", "To:", "Prepared For:" labels near the top of document. This is different from the carrier.
-
-CRITICAL REQUIREMENTS:
-- Extract EVERY table, even if partially visible
-- Maintain exact table structure (headers + data rows)
-- Handle borderless tables and complex layouts
-- Detect hierarchical data (company sections, sub-totals)
-- Flag data quality issues
-- Preserve multi-line headers by joining them with spaces
-
-Return tables in this exact JSON structure:
-{
-  "tables": [
-    {
-      "headers": ["Column 1", "Column 2", "Column 3"],
-      "rows": [
-        ["data1", "data2", "data3"],
-        ["data4", "data5", "data6"]
-      ],
-      "table_type": "commission_table",
-      "page_number": 1,
-      "confidence_score": 0.95,
-      "summary_rows": [5, 10],
-      "metadata": {
-        "borderless": false,
-        "hierarchical": false,
-        "company_sections": []
-      }
-    }
-  ],
-  "document_metadata": {
-    "carrier_name": "Detected Carrier Name",
-    "carrier_confidence": 0.95,
-    "statement_date": "2024-01-31",
-    "date_confidence": 0.92,
-    "broker_company": "Broker/Agent Company Name",
-    "broker_confidence": 0.90,
-    "document_type": "commission_statement"
-  },
-  "extraction_notes": "Any important observations about the document or extraction challenges"
-}
-
-IMPORTANT EXTRACTION RULES:
-1. For multi-line column headers, join them with a space (e.g., "First Name" + "Last Name" = "First Name Last Name")
-2. Preserve exact spacing and formatting in data cells
-3. Convert accounting brackets to negative numbers: (1,234.56) → -1234.56
-4. Identify summary rows by looking for keywords: "Total", "Subtotal", "Grand Total", "Sum"
-5. If a table spans multiple pages, extract each page separately
-6. Include confidence scores based on text clarity and structure completeness
-
-Analyze the document thoroughly and extract all tabular data with precision."""
+        return USER_PROMPT
 
     @staticmethod
     def get_metadata_extraction_prompt() -> str:
@@ -229,23 +170,5 @@ Extract the following information from the document:
 
 Format your response as structured markdown without code blocks. Dont return tables"""
 
-    @staticmethod
-    def get_system_prompt() -> str:
-        """System prompt that sets the context for Claude"""
-        return """You are an expert AI assistant specializing in document analysis and data extraction for insurance commission statements.
 
-You have deep expertise in:
-- Insurance industry terminology and structure
-- Commission statement formats from major carriers
-- Table detection and extraction from complex documents
-- Financial data interpretation
-- Document quality assessment
-
-Your responses are:
-- Precise and accurate
-- Structured in valid JSON format
-- Comprehensive without being verbose
-- Focused on data integrity and completeness
-
-You prioritize accuracy over speed and will flag uncertainties rather than guess."""
 

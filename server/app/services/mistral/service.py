@@ -65,7 +65,8 @@ from .models import (
     IntelligentExtractionResponse,
     EnhancedCommissionDocument,
     EnhancedDocumentMetadata,
-    EnhancedCommissionTable
+    EnhancedCommissionTable,
+    SharedBenchmarkDocument,
 )
 from .prompts import MistralPrompts
 from .utils import PDFProcessor, DataValidator, JSONProcessor, QualityAssessor, CarrierDetector, DateExtractor, TableStructureDetector
@@ -160,6 +161,13 @@ class MistralDocumentAIService:
         # This model powers Mistral's Document AI stack for extracting text and images
         self.intelligent_model = "mistral-ocr-latest"
         self.ocr_model = "mistral-ocr-latest"  # Correct model name for OCR endpoint
+
+        # Chat model for structured extraction on top of OCR markdown (Pixtral / Mistral Large)
+        self.chat_model = os.getenv("MISTRAL_CHAT_MODEL", "pixtral-large-latest")
+
+        # Feature flag: LLM structured extraction after OCR (same prompts/schema as GPT-5 / Claude)
+        self.enable_structured_extraction = self.config.get("enable_structured_extraction", True)
+
         self.max_pages = 500
         
         self.client = None
@@ -238,7 +246,12 @@ class MistralDocumentAIService:
             # We cannot validate it with a simple text test, so we skip validation
             # The model will be tested during actual extraction with proper document input
             logger.info("✅ Mistral client initialized successfully")
-            logger.info(f"   Model: {self.ocr_model} (Mistral OCR for Document AI)")
+            logger.info(
+                "   OCR model: %s | Chat model (structured): %s | structured_extraction=%s",
+                self.ocr_model,
+                self.chat_model,
+                self.enable_structured_extraction,
+            )
             logger.info(f"   API Key: {'*' * (len(api_key) - 4)}{api_key[-4:]}")  # Show last 4 chars for verification
             
         except Exception as e:
@@ -422,7 +435,119 @@ Focus on achieving 99%+ extraction completeness with superior vision processing.
                 "method": "ocr",
                 "content": ""
             }
-    
+
+    def _call_mistral_chat_for_tables(
+        self,
+        ocr_markdown: str,
+        page_count: int,
+    ) -> Dict[str, Any]:
+        """
+        Run Pixtral / Mistral chat on OCR markdown using shared SYSTEM_PROMPT /
+        USER_PROMPT and Pydantic structured outputs (same contract as GPT-5 / Claude).
+
+        Returns:
+            Dict with success, tables, document_metadata, usage (input_tokens/output_tokens
+            mapped from Mistral's prompt_tokens/completion_tokens for calculate_cost).
+        """
+        if not self.client:
+            return {"success": False, "error": "Mistral client not initialized"}
+
+        if not ocr_markdown or not ocr_markdown.strip():
+            return {"success": False, "error": "Empty OCR content"}
+
+        try:
+            system_prompt = MistralPrompts.get_system_prompt()
+            user_prompt = MistralPrompts.get_table_extraction_prompt()
+
+            full_user_content = (
+                user_prompt
+                + "\n\n--- OCR MARKDOWN START ---\n"
+                + ocr_markdown[:100_000]
+                + "\n--- OCR MARKDOWN END ---\n"
+            )
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": full_user_content},
+            ]
+
+            logger.info(
+                "Mistral chat.parse structured extraction model=%s (OCR pages=%s)",
+                self.chat_model,
+                page_count,
+            )
+
+            response = self.client.chat.parse(
+                model=self.chat_model,
+                messages=messages,
+                response_format=SharedBenchmarkDocument,
+                max_tokens=16000,
+                temperature=0.0,
+            )
+
+            if not hasattr(response, "choices") or not response.choices:
+                return {"success": False, "error": "No choices in Mistral chat response"}
+
+            parsed = response.choices[0].message.parsed
+            if not parsed:
+                return {"success": False, "error": "Parsed response is empty"}
+
+            parsed_dict = parsed.model_dump()
+            tables = parsed_dict.get("tables", []) or []
+            doc_meta = dict(parsed_dict.get("document_metadata") or {})
+            notes = parsed_dict.get("extraction_notes")
+            if notes:
+                doc_meta["extraction_notes"] = notes
+
+            normalised_tables: List[Dict[str, Any]] = []
+            for t in tables:
+                headers = t.get("headers", []) or []
+                rows = t.get("rows", []) or []
+                if not headers and not rows:
+                    continue
+
+                n = len(headers)
+                fixed_rows: List[List[str]] = []
+                for row in rows:
+                    row_list = list(row or [])
+                    if n:
+                        row_list = (row_list + [""] * n)[:n]
+                    fixed_rows.append(row_list)
+
+                if not fixed_rows and not headers:
+                    continue
+
+                normalised_tables.append(
+                    {
+                        "headers": headers,
+                        "rows": fixed_rows,
+                        "page_number": t.get("page_number"),
+                        "table_type": t.get("table_type") or "commission_table",
+                        "extractor": "mistral_chat_structured",
+                        "confidence_score": t.get("confidence_score", 0.9),
+                    }
+                )
+
+            usage: Dict[str, Any] = {}
+            if hasattr(response, "usage") and response.usage:
+                pt = getattr(response.usage, "prompt_tokens", None)
+                ct = getattr(response.usage, "completion_tokens", None)
+                usage = {
+                    "input_tokens": pt,
+                    "output_tokens": ct,
+                }
+
+            return {
+                "success": True,
+                "tables": normalised_tables,
+                "document_metadata": doc_meta,
+                "usage": usage,
+            }
+
+        except Exception as e:
+            logger.error("Mistral structured chat extraction failed: %s", e, exc_info=True)
+            return {"success": False, "error": str(e)}
+
     def test_connection(self) -> Dict[str, Any]:
         """
         Test connection with Mistral OCR service.
@@ -545,57 +670,124 @@ Focus on achieving 99%+ extraction completeness with superior vision processing.
     
     async def extract_commission_data_via_ocr(self, file_path: str) -> Dict[str, Any]:
         """
-        Extract commission tables using CORRECT Mistral OCR implementation.
-        
-        This method uses the dedicated OCR endpoint (client.ocr.process)
-        with the correct model name (mistral-ocr-latest) and parses markdown tables.
+        Stage 1: Mistral OCR (mistral-ocr-latest) → markdown + pipe-table baseline.
+
+        Stage 2 (optional): Chat model with shared prompts + SharedBenchmarkDocument
+        structured output — same JSON contract as GPT-5 / Claude.
+
+        Prefers chat-structured tables when present; falls back to OCR markdown tables.
         """
         if not self.is_available():
             return {
                 "success": False,
                 "error": "Mistral OCR service not available - MISTRAL_API_KEY not configured",
-                "tables": []
+                "tables": [],
             }
-        
+
         try:
-            # Read and encode PDF
             with open(file_path, "rb") as f:
                 pdf_content = f.read()
-            pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-            
-            logger.info(f"🔍 Extracting tables via Mistral OCR (model: {self.ocr_model})")
-            
-            # CORRECT: Use OCR endpoint, not chat endpoint
+            pdf_base64 = base64.b64encode(pdf_content).decode("utf-8")
+
+            logger.info("Extracting via Mistral OCR (model: %s)", self.ocr_model)
+
             ocr_response = self.client.ocr.process(
                 model=self.ocr_model,
                 document={
                     "type": "document_url",
-                    "document_url": f"data:application/pdf;base64,{pdf_base64}"
+                    "document_url": f"data:application/pdf;base64,{pdf_base64}",
                 },
-                include_image_base64=True
+                include_image_base64=True,
             )
-            
-            # Extract tables from OCR response
-            tables = self.extract_tables_from_ocr_response(ocr_response)
-            
-            logger.info(f"✅ OCR extraction successful: {len(tables)} tables found")
-            
-            return {
-                "success": True,
-                "tables": tables,
-                "document_metadata": {
-                    "total_pages": len(ocr_response.pages) if hasattr(ocr_response, 'pages') else 1,
-                    "extraction_method": "mistral_ocr_2505",
-                    "model": self.ocr_model
+
+            tables_from_markdown = self.extract_tables_from_ocr_response(ocr_response)
+            total_pages = (
+                len(ocr_response.pages)
+                if hasattr(ocr_response, "pages") and ocr_response.pages
+                else 1
+            )
+
+            logger.info(
+                "OCR baseline: %s tables from %s pages",
+                len(tables_from_markdown),
+                total_pages,
+            )
+
+            combined_markdown = ""
+            if hasattr(ocr_response, "pages") and ocr_response.pages:
+                md_pages: List[str] = []
+                for page in ocr_response.pages:
+                    if hasattr(page, "markdown") and page.markdown:
+                        md_pages.append(page.markdown)
+                combined_markdown = "\n\n--- PAGE BREAK ---\n\n".join(md_pages)
+
+            structured_tables: List[Dict[str, Any]] = []
+            structured_meta: Dict[str, Any] = {}
+            structured_usage: Dict[str, Any] = {}
+
+            if self.enable_structured_extraction and combined_markdown.strip():
+                logger.info("Running Mistral chat structured extraction on OCR markdown")
+                chat_result = self._call_mistral_chat_for_tables(
+                    combined_markdown,
+                    page_count=total_pages,
+                )
+                structured_usage = chat_result.get("usage") or {}
+                if chat_result.get("success"):
+                    structured_meta = chat_result.get("document_metadata") or {}
+                    st = chat_result.get("tables") or []
+                    if st:
+                        structured_tables = st
+                        logger.info(
+                            "Mistral chat structured extraction: %s tables",
+                            len(structured_tables),
+                        )
+                    elif structured_usage:
+                        logger.info(
+                            "Mistral chat returned no tables; using OCR markdown baseline"
+                        )
+                else:
+                    logger.warning(
+                        "Structured extraction failed: %s",
+                        chat_result.get("error", "unknown"),
+                    )
+
+            final_tables = structured_tables if structured_tables else tables_from_markdown
+
+            if not final_tables:
+                logger.warning("No tables from OCR markdown or structured chat")
+                return {
+                    "success": False,
+                    "error": "No tables found in OCR or structured extraction",
+                    "tables": [],
                 }
+
+            document_metadata: Dict[str, Any] = {
+                "total_pages": total_pages,
+                "extraction_method": (
+                    "mistral_ocr_2505_structured" if structured_tables else "mistral_ocr_2505"
+                ),
+                "model": self.ocr_model,
             }
-            
+            if structured_tables:
+                document_metadata["chat_model"] = self.chat_model
+            document_metadata.update(structured_meta)
+
+            result: Dict[str, Any] = {
+                "success": True,
+                "tables": final_tables,
+                "document_metadata": document_metadata,
+            }
+            if structured_usage:
+                result["usage"] = structured_usage
+
+            return result
+
         except Exception as e:
-            logger.error(f"❌ Mistral OCR extraction failed: {e}", exc_info=True)
+            logger.error("Mistral OCR extraction failed: %s", e, exc_info=True)
             return {
                 "success": False,
                 "error": str(e),
-                "tables": []
+                "tables": [],
             }
     
     async def extract_commission_data_intelligently(self, file_path: str) -> Dict:
