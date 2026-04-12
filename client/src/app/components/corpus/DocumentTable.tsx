@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { Trash2, Eye, Edit3, FileText, Loader2, RefreshCw } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import Link from 'next/link';
+import { Trash2, Eye, Edit3, FileText, Loader2, RefreshCw, BarChart3 } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import TierBadge from './TierBadge';
@@ -13,7 +14,7 @@ export interface Document {
   filename: string;
   page_count: number | null;
   is_digital: boolean | null;
-  complexity_tier: 'low' | 'medium' | 'high';
+  complexity_tier: 'low' | 'medium' | 'high' | 'unconfirmed';
   uploaded_at: string;
 }
 
@@ -31,6 +32,8 @@ interface Props {
   onRefresh: () => void;
   onRetrySeed: (doc: Document) => void | Promise<void>;
   onOpenEditor: (doc: Document) => void;
+  /** Close full-screen editor so read-only modal is never stacked with it. */
+  onCloseEditor?: () => void;
 }
 
 export default function DocumentTable({
@@ -40,6 +43,7 @@ export default function DocumentTable({
   onRefresh,
   onRetrySeed,
   onOpenEditor,
+  onCloseEditor,
 }: Props) {
   const [viewGT, setViewGT] = useState<Document | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -57,6 +61,16 @@ export default function DocumentTable({
       setUpdatingTier(null);
     }
   };
+
+  const handleCloseGTModal = useCallback(() => setViewGT(null), []);
+
+  const handleOpenEditor = useCallback(
+    (doc: Document) => {
+      setViewGT(null);
+      onOpenEditor(doc);
+    },
+    [onOpenEditor]
+  );
 
   const handleDelete = async (doc: Document) => {
     setDeleting(doc.id);
@@ -218,6 +232,7 @@ export default function DocumentTable({
                         onChange={e => handleTierChange(doc, e.target.value)}
                         className="text-xs border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       >
+                        <option value="unconfirmed">Unconfirmed</option>
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
@@ -229,10 +244,20 @@ export default function DocumentTable({
                 <td className="px-4 py-3 text-center align-middle">{renderGtBadge(doc)}</td>
 
                 <td className="px-4 py-3">
-                  <div className="flex items-center justify-center gap-1">
+                  <div className="flex items-center justify-center gap-1 flex-wrap">
+                    <Link
+                      href={`/evaluation/${doc.id}`}
+                      title="Extract tools & score"
+                      className="p-1.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 transition-colors"
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                    </Link>
                     <button
                       type="button"
-                      onClick={() => setViewGT(doc)}
+                      onClick={() => {
+                        onCloseEditor?.();
+                        setViewGT(doc);
+                      }}
                       title="View ground truth"
                       className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600 transition-colors"
                     >
@@ -240,7 +265,7 @@ export default function DocumentTable({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onOpenEditor(doc)}
+                      onClick={() => handleOpenEditor(doc)}
                       title="Edit ground truth"
                       className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600 transition-colors"
                     >
@@ -264,7 +289,7 @@ export default function DocumentTable({
       </div>
 
       {viewGT && (
-        <GroundTruthModal docId={viewGT.id} filename={viewGT.filename} onClose={() => setViewGT(null)} />
+        <GroundTruthModal docId={viewGT.id} filename={viewGT.filename} onClose={handleCloseGTModal} />
       )}
 
       {confirmDelete && (

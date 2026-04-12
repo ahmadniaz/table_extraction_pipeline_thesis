@@ -26,7 +26,13 @@ export default function ComplexityBarChart({ data, tools }: Props) {
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-        <XAxis dataKey="tier" tick={{ fontSize: 12 }} tickFormatter={v => v.charAt(0).toUpperCase() + v.slice(1)} />
+        <XAxis
+          dataKey="tier"
+          tick={{ fontSize: 12 }}
+          tickFormatter={v =>
+            v === 'unconfirmed' ? 'Unconf.' : String(v).charAt(0).toUpperCase() + String(v).slice(1)
+          }
+        />
         <YAxis tick={{ fontSize: 11 }} domain={[0, 1]} tickFormatter={v => v.toFixed(1)} />
         <Tooltip
           formatter={(value: number) => value.toFixed(3)}

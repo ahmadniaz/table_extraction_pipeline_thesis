@@ -7,9 +7,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
-  { href: '/corpus',     label: 'Corpus' },
-  { href: '/evaluation', label: 'Evaluation' },
-  { href: '/results',    label: 'Results' },
+  { href: '/corpus', label: 'Corpus' },
+  { href: '/results', label: 'Results' },
 ];
 
 export default function Navbar() {
@@ -20,7 +19,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-6">
         {/* Brand */}
-        <Link href="/evaluation" className="flex items-center gap-2 shrink-0">
+        <Link href="/corpus" className="flex items-center gap-2 shrink-0">
           <FlaskConical className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
           <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm whitespace-nowrap">
             PDF Table Extraction Evaluator

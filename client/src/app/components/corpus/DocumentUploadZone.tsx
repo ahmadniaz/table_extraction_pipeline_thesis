@@ -9,6 +9,15 @@ import { cn } from '@/lib/utils';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
+/** Seed info from POST /api/documents/upload (Claude or DEFAULT_EXTRACTION_TOOL + GT). */
+export interface UploadSeedPayload {
+  seed_tool?: string;
+  tables_seeded?: number;
+  success?: boolean;
+  error?: string;
+  transient_failure?: boolean;
+}
+
 export interface UploadedDocumentPayload {
   id: string;
   filename: string;
@@ -16,6 +25,7 @@ export interface UploadedDocumentPayload {
   page_count: number | null;
   is_digital: boolean | null;
   uploaded_at: string;
+  seed?: UploadSeedPayload;
 }
 
 interface Props {
@@ -39,7 +49,7 @@ export default function DocumentUploadZone({ onUploaded }: Props) {
       try {
         const form = new FormData();
         form.append('file', file);
-        form.append('complexity_tier', 'medium');
+        form.append('complexity_tier', 'unconfirmed');
         const { data } = await axios.post<UploadedDocumentPayload>(`${API}/api/documents/upload`, form);
         toast.success(`Uploaded "${file.name}"`);
         await onUploaded(data);

@@ -2,7 +2,7 @@ import uuid
 import csv
 import io
 import logging
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -21,6 +21,23 @@ router = APIRouter(tags=["evaluation"])
 ALL_TOOLS = ["pymupdf", "docling", "aws_textract", "google_docai", "gpt5", "claude_sonnet", "mistral"]
 
 _SCORE_ZERO_NOTE = "Scored as 0 — tool produced no output"
+
+# Extraction outcomes we treat as idempotent: re-calling POST /api/extract returns already_exists.
+# Any other failure_reason (e.g. api_error) must allow delete + re-run so Retry works.
+_FAILURE_REASONS_IDEMPOTENT_OK = frozenset({"tool_limitation", "empty_output"})
+
+
+def _should_replace_existing_extraction(existing: List[ExtractionResult]) -> bool:
+    """True if existing rows should be deleted and extraction re-run."""
+    if not existing:
+        return False
+    if any(bool(getattr(r, "is_transient_failure", False)) for r in existing):
+        return True
+    for r in existing:
+        fr = getattr(r, "failure_reason", None)
+        if fr and fr not in _FAILURE_REASONS_IDEMPOTENT_OK:
+            return True
+    return False
 
 
 def _summarise_extraction_rows(results: List[ExtractionResult]) -> dict:
@@ -51,6 +68,17 @@ class EvaluateRequest(BaseModel):
 class BatchEvaluateRequest(BaseModel):
     tools: List[str] = ["all"]
     tier: str = "all"
+
+
+class ExtractionTableUpdate(BaseModel):
+    """One table in manual extraction edit (order in array = table_index after save)."""
+
+    headers: List[str]
+    rows: List[List[Any]]
+
+
+class PutExtractionsBody(BaseModel):
+    tables: List[ExtractionTableUpdate]
 
 
 def _resolve_tools(tools: List[str]) -> List[str]:
@@ -93,10 +121,10 @@ async def extract_single_tool(
     existing = list(existing_res.scalars().all())
 
     if existing:
-        had_transient = any(bool(getattr(r, "is_transient_failure", False)) for r in existing)
-        if not had_transient:
+        if not _should_replace_existing_extraction(existing):
             out = _summarise_extraction_rows(existing)
             out["already_exists"] = True
+            out["extraction_executed"] = False
             return out
         er_ids = [r.id for r in existing]
         await db.execute(delete(EvaluationScore).where(EvaluationScore.extraction_result_id.in_(er_ids)))
@@ -114,6 +142,7 @@ async def extract_single_tool(
     rows = await runner.run_tool(tool_name, doc.file_path, doc.id, db)
     out = _summarise_extraction_rows(rows)
     out["already_exists"] = False
+    out["extraction_executed"] = True
     return out
 
 
@@ -319,8 +348,11 @@ async def evaluate_batch(
 ):
     query = select(Document)
     if body.tier != "all":
-        if body.tier not in ("low", "medium", "high"):
-            raise HTTPException(400, "tier must be 'all', 'low', 'medium', or 'high'")
+        if body.tier not in ("low", "medium", "high", "unconfirmed"):
+            raise HTTPException(
+                400,
+                "tier must be 'all', 'low', 'medium', 'high', or 'unconfirmed'",
+            )
         query = query.where(Document.complexity_tier == body.tier)
 
     result = await db.execute(query.order_by(Document.uploaded_at))
@@ -455,6 +487,107 @@ async def get_extractions_for_tool(
             "is_transient_failure": bool(er.is_transient_failure),
         }
         for er in ers
+    ]
+
+
+@router.put("/api/extractions/{doc_id}/{tool_name}")
+async def put_extractions_for_tool(
+    doc_id: uuid.UUID,
+    tool_name: str,
+    body: PutExtractionsBody,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Replace all ExtractionResult rows for a document + tool with manually edited tables.
+    Preserves processing_time_ms, cost_usd, and raw_output on table_index 0 from the prior run.
+    Deletes dependent EvaluationScore rows for superseded extraction results.
+    """
+    if tool_name not in ALL_TOOLS:
+        raise HTTPException(400, f"Unknown tool_name. Valid: {ALL_TOOLS}")
+
+    doc_res = await db.execute(select(Document).where(Document.id == doc_id))
+    if not doc_res.scalar_one_or_none():
+        raise HTTPException(404, "Document not found")
+
+    if not body.tables:
+        raise HTTPException(400, "At least one table is required")
+
+    er_result = await db.execute(
+        select(ExtractionResult)
+        .where(
+            and_(
+                ExtractionResult.document_id == doc_id,
+                ExtractionResult.tool_name == tool_name,
+            )
+        )
+        .order_by(ExtractionResult.table_index)
+    )
+    existing = list(er_result.scalars().all())
+
+    proc_ms = 0
+    cost_val = None
+    raw_out = None
+    if existing:
+        ordered = sorted(existing, key=lambda r: r.table_index)
+        tpl = ordered[0]
+        proc_ms = int(tpl.processing_time_ms or 0)
+        cost_val = tpl.cost_usd
+        raw_out = tpl.raw_output
+        for r in ordered:
+            pm = int(r.processing_time_ms or 0)
+            if pm > proc_ms:
+                proc_ms = pm
+        er_ids = [r.id for r in existing]
+        await db.execute(delete(EvaluationScore).where(EvaluationScore.extraction_result_id.in_(er_ids)))
+        await db.execute(
+            delete(ExtractionResult).where(
+                and_(
+                    ExtractionResult.document_id == doc_id,
+                    ExtractionResult.tool_name == tool_name,
+                )
+            )
+        )
+        await db.commit()
+
+    for idx, tbl in enumerate(body.tables):
+        er = ExtractionResult(
+            document_id=doc_id,
+            tool_name=tool_name,
+            table_index=idx,
+            extracted_headers=tbl.headers,
+            extracted_rows=tbl.rows,
+            processing_time_ms=proc_ms if idx == 0 else 0,
+            cost_usd=cost_val if idx == 0 else 0,
+            raw_output=raw_out if idx == 0 else None,
+            error_message=None,
+            failure_reason=None,
+            is_transient_failure=False,
+        )
+        db.add(er)
+
+    await db.commit()
+
+    out_res = await db.execute(
+        select(ExtractionResult)
+        .where(
+            and_(
+                ExtractionResult.document_id == doc_id,
+                ExtractionResult.tool_name == tool_name,
+            )
+        )
+        .order_by(ExtractionResult.table_index)
+    )
+    saved = list(out_res.scalars().all())
+    return [
+        {
+            "extraction_result_id": str(er.id),
+            "table_index": er.table_index,
+            "extracted_headers": er.extracted_headers,
+            "extracted_rows": er.extracted_rows,
+            "processing_time_ms": er.processing_time_ms,
+            "cost_usd": float(er.cost_usd) if er.cost_usd else None,
+        }
+        for er in saved
     ]
 
 

@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import axios from 'axios';
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+import { sharedGetGroundTruth } from '@/lib/sharedGroundTruthGet';
 
 interface GroundTruthTable {
   id: string;
@@ -26,10 +25,21 @@ export default function GroundTruthModal({ docId, filename, onClose }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`${API}/api/ground-truth/${docId}`)
-      .then(r => setTables(r.data))
-      .catch(() => setTables([]))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    setLoading(true);
+    sharedGetGroundTruth(docId)
+      .then(r => {
+        if (!cancelled) setTables((r.data as GroundTruthTable[]) ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setTables([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [docId]);
 
   return (

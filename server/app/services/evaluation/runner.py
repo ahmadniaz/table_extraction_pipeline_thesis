@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ExtractionResult, Document
 from .cost_calculator import calculate_cost
+from .table_merging import merge_similar_tables_global
 
 logger = logging.getLogger(__name__)
 
@@ -137,12 +138,15 @@ def _normalise_tables(raw: Any) -> List[Dict[str, Any]]:
             entry = {"headers": headers, "rows": rows}
             for meta_key in (
                 "page_number",
+                "table_index",
                 "strategy_used",
                 "bbox",
                 "row_count",
                 "col_count",
                 "textract_confidence",
                 "cell_matching_used",
+                "metadata",
+                "extractor",
             ):
                 if meta_key in t:
                     entry[meta_key] = t[meta_key]
@@ -342,6 +346,7 @@ class EvaluationRunner:
                     is_transient = False
             else:
                 tables = _normalise_tables(raw)
+                tables = merge_similar_tables_global(tables)
         except BaseException as exc:
             logger.exception("%s failed on %s", tool_name, file_path)
             failure_reason, is_transient, error_msg = _classify_exception(exc)

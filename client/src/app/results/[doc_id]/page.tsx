@@ -3,15 +3,17 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { Loader2, Download, ArrowLeft } from 'lucide-react';
 import TierBadge from '@/app/components/corpus/TierBadge';
+import { sharedGetExtractionsForTool } from '@/lib/sharedExtractionsGet';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 const TOOLS = [
   { id: 'pymupdf', label: 'PyMuPDF', gen: 'Rule-based' },
   { id: 'docling', label: 'Docling', gen: 'Computer Vision' },
+  { id: 'aws_textract', label: 'AWS Textract', gen: 'Computer Vision' },
   { id: 'google_docai', label: 'Google DocAI', gen: 'Computer Vision' },
   { id: 'gpt5', label: 'GPT-5 Vision', gen: 'LLM' },
   { id: 'claude_sonnet', label: 'Claude Sonnet', gen: 'LLM' },
@@ -53,6 +55,10 @@ function avg(nums: (number | null | undefined)[]): number | null {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
 }
 
+function isAbortError(e: unknown): boolean {
+  return isAxiosError(e) && e.code === 'ERR_CANCELED';
+}
+
 export default function DocumentResultsPage() {
   const params = useParams();
   const docId = (params?.doc_id as string) ?? '';
@@ -62,32 +68,45 @@ export default function DocumentResultsPage() {
   const [ers, setErs] = useState<Record<string, Er[]>>({});
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [dRes, sRes, ...extRes] = await Promise.all([
-        axios.get<DocInfo>(`${API}/api/documents/${docId}`),
-        axios.get<ScoreRow[]>(`${API}/api/results/${docId}`),
-        ...TOOLS.map(t => axios.get<Er[]>(`${API}/api/extractions/${docId}/${t.id}`).catch(() => ({ data: [] }))),
-      ]);
-      setDoc(dRes.data);
-      setScores(sRes.data || []);
-      const erMap: Record<string, Er[]> = {};
-      TOOLS.forEach((t, i) => {
-        erMap[t.id] = (extRes[i] as { data: Er[] }).data || [];
-      });
-      setErs(erMap);
-    } catch {
-      setDoc(null);
-      setScores([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [docId]);
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const [dRes, sRes, ...extRes] = await Promise.all([
+          axios.get<DocInfo>(`${API}/api/documents/${docId}`, { signal }),
+          axios.get<ScoreRow[]>(`${API}/api/results/${docId}`, { signal }),
+          ...TOOLS.map(t =>
+            sharedGetExtractionsForTool<Er[]>(docId, t.id, { signal }).catch(e => {
+              if (isAbortError(e)) throw e;
+              return { data: [] as Er[] };
+            })
+          ),
+        ]);
+        setDoc(dRes.data);
+        setScores(sRes.data || []);
+        const erMap: Record<string, Er[]> = {};
+        TOOLS.forEach((t, i) => {
+          erMap[t.id] = (extRes[i] as { data: Er[] }).data || [];
+        });
+        setErs(erMap);
+      } catch (e) {
+        if (isAbortError(e)) return;
+        setDoc(null);
+        setScores([]);
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [docId]
+  );
 
   useEffect(() => {
     if (!docId) return;
-    load();
+    const ac = new AbortController();
+    void load(ac.signal);
+    return () => ac.abort();
   }, [load, docId]);
 
   const tableRows = useMemo(() => {
@@ -167,7 +186,7 @@ export default function DocumentResultsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{doc.filename}</h1>
-          <TierBadge tier={doc.complexity_tier as 'low' | 'medium' | 'high'} />
+          <TierBadge tier={doc.complexity_tier as 'low' | 'medium' | 'high' | 'unconfirmed'} />
           <span className="text-sm text-slate-500">{doc.page_count ?? '—'} pages</span>
           <span
             className={`text-xs font-medium px-2 py-0.5 rounded ${

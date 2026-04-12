@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { cn } from '@/lib/utils';
+import { sharedGetExtractionsForTool } from '@/lib/sharedExtractionsGet';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -72,13 +73,13 @@ export default function ExtractionPreviewModal({ docId, filename, toolName, tool
     (async () => {
       try {
         const [exRes, gtRes] = await Promise.all([
-          axios.get<
+          sharedGetExtractionsForTool<
             {
               table_index: number;
               extracted_headers: string[] | null;
               extracted_rows: string[][] | null;
             }[]
-          >(`${API}/api/extractions/${docId}/${toolName}`),
+          >(docId, toolName),
           axios.get<{ table_index: number; headers: string[]; rows: string[][]; confirmed?: boolean }[]>(
             `${API}/api/ground-truth/${docId}`
           ),
@@ -109,7 +110,7 @@ export default function ExtractionPreviewModal({ docId, filename, toolName, tool
     };
   }, [docId, toolName]);
 
-  const tablesCount = ext.filter(e => e.extracted_rows && e.extracted_rows.length > 0).length;
+  const tablesCount = ext.length;
 
   const extCur = ext[tabExt];
   const extHeaders = extCur?.extracted_headers ?? [];

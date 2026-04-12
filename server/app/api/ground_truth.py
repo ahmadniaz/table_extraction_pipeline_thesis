@@ -3,7 +3,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
-from typing import List, Any, Optional
+from typing import List, Any, Optional, Dict
 from sqlalchemy import select, delete as sa_delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,7 +38,8 @@ class ConfirmTableIn(BaseModel):
     table_index: int
     headers: List[str]
     rows: List[List[Any]]
-    correction_log: List[CorrectionEntry] = Field(default_factory=list)
+    # Cell edits use row/col/original/corrected; merge and other audits may use field/old_value/new_value/corrected_at
+    correction_log: List[Dict[str, Any]] = Field(default_factory=list)
     notes: Optional[str] = None
 
 
@@ -111,7 +112,7 @@ async def confirm_ground_truth(
 
     n = 0
     for t in body.tables:
-        log = [e.model_dump() for e in t.correction_log]
+        log = list(t.correction_log)
         gt = GroundTruthTable(
             document_id=doc_id,
             table_index=t.table_index,

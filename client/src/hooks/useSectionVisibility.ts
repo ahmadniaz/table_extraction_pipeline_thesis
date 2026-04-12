@@ -31,6 +31,7 @@ export const useSectionVisibility = (options: UseSectionVisibilityOptions = {}) 
 
   // Método 1: Intersection Observer (más preciso)
   useEffect(() => {
+    const el = sectionRef.current;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -61,13 +62,13 @@ export const useSectionVisibility = (options: UseSectionVisibilityOptions = {}) 
       }
     );
 
-    if (sectionRef.current) {
-      observer.observe(sectionRef.current);
+    if (el) {
+      observer.observe(el);
     }
 
     return () => {
-      if (sectionRef.current) {
-        observer.unobserve(sectionRef.current);
+      if (el) {
+        observer.unobserve(el);
       }
     };
   }, [threshold, rootMargin, debug]);

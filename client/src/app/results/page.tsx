@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { BarChart2, Download, RefreshCw, Loader2 } from 'lucide-react';
@@ -78,7 +78,7 @@ function buildToolSummaries(rows: RawRow[]): ToolSummary[] {
 
 function buildChartData(rows: RawRow[], metric: 'f1_score' | 'teds_score') {
   const filtered = rowsExcludingTransient(rows);
-  const tiers = ['low', 'medium', 'high'];
+  const tiers = ['low', 'medium', 'high', 'unconfirmed'];
   const tools = [...new Set(filtered.map(r => r.tool_name))];
 
   return tiers.map(tier => {
@@ -155,12 +155,17 @@ function buildPerDocSummaries(docs: DocumentRow[], rows: RawRow[], gtCounts: Rec
   });
 }
 
+type TierFilter = 'all' | 'low' | 'medium' | 'high' | 'unconfirmed';
+type PdfTypeFilter = 'all' | 'digital' | 'scanned';
+
 export default function ResultsPage() {
   const [tab, setTab] = useState<'summary' | 'perDoc'>('summary');
   const [rows, setRows] = useState<RawRow[]>([]);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [gtCounts, setGtCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [tierFilter, setTierFilter] = useState<TierFilter>('all');
+  const [pdfTypeFilter, setPdfTypeFilter] = useState<PdfTypeFilter>('all');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -196,13 +201,48 @@ export default function ResultsPage() {
     fetchData();
   }, [fetchData]);
 
-  const summaries = buildToolSummaries(rows);
-  const filteredRows = rowsExcludingTransient(rows);
-  const tools = [...new Set(filteredRows.map(r => r.tool_name))];
-  const f1ChartData = buildChartData(rows, 'f1_score');
-  const tedsChartData = buildChartData(rows, 'teds_score');
-  const resultsByDoc = buildResultsByDoc(rows);
-  const perDocSummaries = buildPerDocSummaries(documents, rows, gtCounts);
+  const docById = useMemo(
+    () => Object.fromEntries(documents.map(d => [d.id, d])) as Record<string, DocumentRow>,
+    [documents]
+  );
+
+  const filteredRows = useMemo(() => {
+    return rows.filter(r => {
+      const d = docById[r.document_id];
+      if (!d) return true;
+      if (tierFilter !== 'all' && d.complexity_tier !== tierFilter) return false;
+      if (pdfTypeFilter === 'digital' && d.is_digital !== true) return false;
+      if (pdfTypeFilter === 'scanned' && d.is_digital !== false) return false;
+      return true;
+    });
+  }, [rows, docById, tierFilter, pdfTypeFilter]);
+
+  const filterActive = tierFilter !== 'all' || pdfTypeFilter !== 'all';
+
+  const summaries = buildToolSummaries(filteredRows);
+  const nonTransientFiltered = rowsExcludingTransient(filteredRows);
+  const tools = [...new Set(nonTransientFiltered.map(r => r.tool_name))];
+  const f1ChartData = buildChartData(filteredRows, 'f1_score');
+  const tedsChartData = buildChartData(filteredRows, 'teds_score');
+  const resultsByDoc = buildResultsByDoc(filteredRows);
+  const filteredDocIds = useMemo(
+    () => [...new Set(filteredRows.map(r => r.document_id))],
+    [filteredRows]
+  );
+  const drillDocuments = useMemo(
+    () => documents.filter(d => filteredDocIds.includes(d.id)),
+    [documents, filteredDocIds]
+  );
+  const docsPassingMetaFilter = useMemo(() => {
+    return documents.filter(d => {
+      if (tierFilter !== 'all' && d.complexity_tier !== tierFilter) return false;
+      if (pdfTypeFilter === 'digital' && d.is_digital !== true) return false;
+      if (pdfTypeFilter === 'scanned' && d.is_digital !== false) return false;
+      return true;
+    });
+  }, [documents, tierFilter, pdfTypeFilter]);
+
+  const perDocSummaries = buildPerDocSummaries(docsPassingMetaFilter, filteredRows, gtCounts);
 
   const handleExport = () => {
     window.open(`${API}/api/results/export/csv`, '_blank');
@@ -213,7 +253,7 @@ export default function ResultsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="w-[90%] mx-auto px-4 sm:px-6 py-8 space-y-8">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg">
@@ -223,7 +263,9 @@ export default function ResultsPage() {
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Evaluation Results</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               {rows.length > 0
-                ? `${rows.length} scored results across ${documents.length} documents`
+                ? filterActive
+                  ? `${filteredRows.length} of ${rows.length} scored results (filtered) · ${documents.length} documents`
+                  : `${rows.length} scored results across ${documents.length} documents`
                 : 'No results yet — run an evaluation first'}
             </p>
           </div>
@@ -277,6 +319,52 @@ export default function ResultsPage() {
         </button>
       </div>
 
+      {!loading && rows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Filters
+          </span>
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <span className="text-xs text-slate-500">Tier</span>
+            <select
+              value={tierFilter}
+              onChange={e => setTierFilter(e.target.value as TierFilter)}
+              className="text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All tiers</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="unconfirmed">Unconfirmed</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <span className="text-xs text-slate-500">PDF type</span>
+            <select
+              value={pdfTypeFilter}
+              onChange={e => setPdfTypeFilter(e.target.value as PdfTypeFilter)}
+              className="text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All</option>
+              <option value="digital">Digital</option>
+              <option value="scanned">Scanned</option>
+            </select>
+          </label>
+          {filterActive && (
+            <button
+              type="button"
+              onClick={() => {
+                setTierFilter('all');
+                setPdfTypeFilter('all');
+              }}
+              className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
@@ -297,7 +385,7 @@ export default function ResultsPage() {
             </div>
           </div>
 
-          {rows.length > 0 && tools.length > 0 && (
+          {filteredRows.length > 0 && tools.length > 0 && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
                 <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-4">
@@ -315,7 +403,7 @@ export default function ResultsPage() {
             </div>
           )}
 
-          {documents.length > 0 && (
+          {drillDocuments.length > 0 && (
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
               <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700">
                 <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
@@ -323,7 +411,7 @@ export default function ResultsPage() {
                 </h2>
               </div>
               <div className="p-6">
-                <DocumentDrillDown documents={documents} resultsByDoc={resultsByDoc} />
+                <DocumentDrillDown documents={drillDocuments} resultsByDoc={resultsByDoc} />
               </div>
             </div>
           )}

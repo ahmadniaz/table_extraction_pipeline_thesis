@@ -9,7 +9,7 @@ PRICE_PER_PAGE = {
     "pymupdf": 0.0,
     "docling": 0.0,
     "aws_textract": 0.015,
-    "google_docai": 0.0065,
+    "google_docai": 0.01,
     "gpt5": 0.0,       # estimated from tokens below
     "claude_sonnet": 0.0,  # estimated from tokens below
     "mistral": 0.0,     # estimated from tokens below
@@ -17,9 +17,9 @@ PRICE_PER_PAGE = {
 
 # Per-token pricing (USD) — input / output
 _TOKEN_PRICING = {
-    "gpt5": {"input": 5.00 / 1_000_000, "output": 15.00 / 1_000_000},
+    "gpt5": {"input": 2.00 / 1_000_000, "output": 8.00 / 1_000_000},
     "claude_sonnet": {"input": 3.00 / 1_000_000, "output": 15.00 / 1_000_000},
-    "mistral": {"input": 2.00 / 1_000_000, "output": 6.00 / 1_000_000},
+    "mistral": {"input": 0.5 / 1_000_000, "output": 1.5 / 1_000_000},
 }
 
 # Rough tokens-per-page estimate when actual counts are unavailable

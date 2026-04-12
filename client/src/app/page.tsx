@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** Default landing: batch evaluation hub (pick tools / documents). Corpus remains in nav. */
+/** Default landing: document corpus (upload → ground truth → per-document evaluation). */
 export default function HomePage() {
-  redirect('/evaluation');
+  redirect('/corpus');
 }

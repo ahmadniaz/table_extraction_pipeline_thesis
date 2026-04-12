@@ -1,9 +1,11 @@
 """
 AWS Textract table extraction service — thesis-grade implementation.
 
-Uses the AnalyzeDocument synchronous API with FeatureTypes=['TABLES'] for
-both scanned and digital PDFs. Table reconstruction follows the official
-Block relationship graph:
+Single-page PDFs: synchronous AnalyzeDocument with Document={"Bytes": ...}.
+
+Multi-page PDFs: asynchronous StartDocumentAnalysis / GetDocumentAnalysis with
+the document in S3 (sync Bytes API is single-page only per AWS). Table
+reconstruction follows the official Block relationship graph:
 
     PAGE → TABLE → CELL / MERGED_CELL → WORD / SELECTION_ELEMENT
 
@@ -15,21 +17,20 @@ Pricing (us-east-1 / us-west-2, April 2026):
     AnalyzeDocument TABLES: $0.015 per page (first 1M pages/month).
     Tracked in cost_calculator.py as PRICE_PER_PAGE["aws_textract"] = 0.015.
 
+Environment:
+  - AWS_REGION — Textract and S3 client region (bucket should match).
+  - AWS_S3_BUCKET — required for multi-page PDFs (upload → analyze → delete).
+  - Standard boto3 credential chain for both Textract and S3.
+
 Design notes:
-  - PDF bytes are read from local disk and sent via Document={'Bytes': ...}.
-    This avoids requiring an S3 bucket in the thesis environment. An S3 path
-    option (Document={'S3Object': {...}}) is left as a documented alternative.
-  - Credentials are resolved from the standard boto3 credential chain
-    (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY env vars, ~/.aws/credentials,
-    EC2 instance roles, etc.). No keys are read from the project .env file.
-  - All Textract calls are synchronous; the runner executes them via
-    asyncio.run_in_executor to avoid blocking the FastAPI event loop.
-  - boto3 errors are NOT swallowed. They propagate to EvaluationRunner
-    where _classify_exception handles throttling / connection failures.
+  - boto3 errors are NOT swallowed; they propagate to EvaluationRunner.
+  - Runner executes this service via asyncio.run_in_executor (blocking I/O).
 """
 
 import logging
 import os
+import time
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -38,15 +39,16 @@ logger = logging.getLogger(__name__)
 
 class TextractService:
     """
-    Extracts tables from PDF documents using AWS Textract AnalyzeDocument.
+    Extracts tables from PDF documents using AWS Textract (sync or async API).
 
-    Each instance lazily creates one boto3 Textract client, which is then
-    reused across all extraction calls (boto3 clients are thread-safe).
+    Each instance lazily creates boto3 Textract (and S3) clients, reused
+    across calls (boto3 clients are thread-safe).
     """
 
     def __init__(self, region_name: Optional[str] = None) -> None:
         self._region = region_name or os.environ.get("AWS_REGION", "us-east-1")
         self._client: Optional[Any] = None
+        self._s3: Optional[Any] = None
 
     def _get_client(self) -> Any:
         """Lazily create the boto3 Textract client on first use."""
@@ -67,86 +69,171 @@ class TextractService:
             )
         return self._client
 
+    def _get_s3_client(self) -> Any:
+        if self._s3 is None:
+            import boto3
+            from botocore.config import Config as BotoConfig
+
+            cfg = BotoConfig(
+                retries={"max_attempts": 3, "mode": "standard"},
+                read_timeout=120,
+                connect_timeout=10,
+            )
+            self._s3 = boto3.client("s3", region_name=self._region, config=cfg)
+            logger.info(
+                "TextractService: S3 client initialised (region=%s)", self._region
+            )
+        return self._s3
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def analyze_document_tables(self, file_path: str) -> Dict[str, Any]:
         """
-        Run AnalyzeDocument (TABLES) on the given PDF and return structured data.
-
-        Args:
-            file_path: Absolute or relative path to the PDF file on disk.
+        Route: synchronous AnalyzeDocument for single-page PDFs; asynchronous
+        S3-based analysis for multi-page PDFs.
 
         Returns:
-            {
-                "tables": [
-                    {
-                        "headers": list[str],
-                        "rows": list[list[str]],
-                        "page_number": int,          # 0-based
-                        "table_index": int,
-                        "row_count": int,
-                        "col_count": int,
-                        "textract_confidence": float,
-                    },
-                    ...
-                ],
-                "pages_analyzed": int,
-                "tool": "aws_textract",
-            }
+            {"tables": [...], "pages_analyzed": int, "tool": "aws_textract"}
 
         Raises:
             FileNotFoundError: if file_path does not exist.
-            botocore.exceptions.ClientError: for AWS API errors (throttling,
-                credentials, unsupported document format, etc.).
-            botocore.exceptions.BotoCoreError: for network / endpoint errors.
+            ValueError: if multi-page and AWS_S3_BUCKET is not set.
+            RuntimeError: if async Textract job fails or times out.
+            botocore.exceptions.ClientError / BotoCoreError: propagate to runner.
         """
         path = Path(file_path)
         if not path.exists():
             raise FileNotFoundError(f"PDF not found: {file_path}")
 
-        pdf_bytes = path.read_bytes()
+        import fitz
+
+        doc = fitz.open(str(path))
+        try:
+            page_count = doc.page_count
+        finally:
+            doc.close()
+
+        if page_count == 1:
+            return self._analyze_sync(path)
+        return self._analyze_async_s3(path, page_count)
+
+    def _analyze_sync(self, path: Path) -> Dict[str, Any]:
         client = self._get_client()
-
         logger.info(
-            "TextractService: calling AnalyzeDocument for %s (%d bytes)",
+            "TextractService: synchronous AnalyzeDocument for %s (%d bytes)",
             path.name,
-            len(pdf_bytes),
+            path.stat().st_size,
         )
-
-        # S3 alternative (for production use):
-        #   response = client.analyze_document(
-        #       Document={"S3Object": {"Bucket": bucket, "Name": key}},
-        #       FeatureTypes=["TABLES"],
-        #   )
         response = client.analyze_document(
-            Document={"Bytes": pdf_bytes},
+            Document={"Bytes": path.read_bytes()},
             FeatureTypes=["TABLES"],
         )
-
         blocks = response.get("Blocks", [])
+        return self._parse_blocks(blocks, path.name)
+
+    def _analyze_async_s3(self, path: Path, page_count: int) -> Dict[str, Any]:
+        s3_bucket = os.environ.get("AWS_S3_BUCKET", "").strip()
+        if not s3_bucket:
+            raise ValueError(
+                "AWS_S3_BUCKET environment variable is required for multi-page PDFs "
+                "(Textract synchronous Bytes API supports single-page documents only)."
+            )
+
+        s3_key = f"textract-jobs/{uuid.uuid4().hex}/{path.name}"
+        s3 = self._get_s3_client()
+
+        logger.info(
+            "TextractService: uploading %s (%d pages) to s3://%s/%s",
+            path.name,
+            page_count,
+            s3_bucket,
+            s3_key,
+        )
+        s3.upload_file(str(path), s3_bucket, s3_key)
+
+        try:
+            client = self._get_client()
+            start = client.start_document_analysis(
+                DocumentLocation={
+                    "S3Object": {"Bucket": s3_bucket, "Name": s3_key}
+                },
+                FeatureTypes=["TABLES"],
+            )
+            job_id = start["JobId"]
+            logger.info(
+                "TextractService: async job %s started for %s", job_id, path.name
+            )
+
+            result = self._poll_async_job(client, job_id, path.name)
+            all_blocks = self._collect_all_blocks(client, job_id, result)
+
+            return self._parse_blocks(all_blocks, path.name)
+        finally:
+            try:
+                s3.delete_object(Bucket=s3_bucket, Key=s3_key)
+                logger.info(
+                    "TextractService: cleaned up s3://%s/%s", s3_bucket, s3_key
+                )
+            except Exception as cleanup_err:
+                logger.warning(
+                    "TextractService: S3 cleanup failed: %s", cleanup_err
+                )
+
+    def _poll_async_job(self, client: Any, job_id: str, doc_name: str) -> Dict[str, Any]:
+        """Poll GetDocumentAnalysis until SUCCEEDED or FAILED."""
+        delay = 2.0
+        max_attempts = 30
+        last: Dict[str, Any] = {}
+
+        for attempt in range(max_attempts):
+            last = client.get_document_analysis(JobId=job_id)
+            status = last.get("JobStatus")
+            if status == "SUCCEEDED":
+                return last
+            if status == "FAILED":
+                msg = last.get("StatusMessage", "unknown")
+                raise RuntimeError(f"Textract job FAILED for {doc_name}: {msg}")
+            time.sleep(min(delay, 32.0))
+            delay = min(delay * 2.0, 32.0)
+
+        raise RuntimeError(
+            f"Textract job timed out for {doc_name} after {max_attempts} polls"
+        )
+
+    def _collect_all_blocks(
+        self, client: Any, job_id: str, first: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Aggregate all Blocks using NextToken pagination (async API)."""
+        all_blocks: List[Dict[str, Any]] = list(first.get("Blocks", []))
+        next_token = first.get("NextToken")
+        while next_token:
+            page = client.get_document_analysis(
+                JobId=job_id, NextToken=next_token
+            )
+            all_blocks.extend(page.get("Blocks", []))
+            next_token = page.get("NextToken")
+        return all_blocks
+
+    def _parse_blocks(self, blocks: List[Dict[str, Any]], doc_name: str) -> Dict[str, Any]:
         blocks_by_id: Dict[str, Any] = {blk["Id"]: blk for blk in blocks}
 
-        # Count distinct PAGE blocks to report pages_analyzed
         pages_analyzed = sum(1 for b in blocks if b.get("BlockType") == "PAGE")
-
-        # Collect all TABLE blocks in document order
         table_blocks = [b for b in blocks if b.get("BlockType") == "TABLE"]
 
         logger.info(
             "TextractService: %d TABLE blocks found in %s (%d pages)",
             len(table_blocks),
-            path.name,
+            doc_name,
             pages_analyzed,
         )
 
         tables: List[Dict[str, Any]] = []
-        for raw_idx, table_block in enumerate(table_blocks):
+        for table_block in table_blocks:
             result = self._extract_table(table_block, blocks_by_id)
             if result is None:
                 continue
-            # Attach positional metadata
             result["page_number"] = self._get_page_number(
                 table_block, blocks_by_id
             )
@@ -156,7 +243,7 @@ class TextractService:
         logger.info(
             "TextractService: %d non-empty tables extracted from %s",
             len(tables),
-            path.name,
+            doc_name,
         )
 
         return {
@@ -204,8 +291,6 @@ class TextractService:
                 max_row = max(max_row, row + row_span - 1)
                 max_col = max(max_col, col + col_span - 1)
 
-                # For MERGED_CELL, place text at the top-left position of the span
-                # to avoid overwriting non-merged cells in the grid.
                 key = (row, col)
                 if key not in cells:
                     cells[key] = {
@@ -216,7 +301,6 @@ class TextractService:
                         "confidence": confidence,
                     }
                 else:
-                    # Append extra text if both cells have content (rare edge case)
                     existing = cells[key]["text"]
                     if text and existing:
                         cells[key]["text"] = f"{existing} {text}".strip()
@@ -227,7 +311,6 @@ class TextractService:
         if max_row == 0 or max_col == 0:
             return None
 
-        # Build dense 2D grid (1-based RowIndex / ColumnIndex → 0-based arrays)
         grid: List[List[str]] = [["" for _ in range(max_col)] for _ in range(max_row)]
         header_flags: List[List[bool]] = [
             [False for _ in range(max_col)] for _ in range(max_row)
@@ -245,9 +328,6 @@ class TextractService:
                 grid[r0][c0] = info["text"].strip()
             header_flags[r0][c0] = header_flags[r0][c0] or info["is_header"]
 
-        # ── Identify header row ──
-        # Use the first row where ≥ 50% of non-empty cells carry COLUMN_HEADER.
-        # Fall back to the first row that contains any text.
         header_row_idx: Optional[int] = None
         for r in range(max_row):
             non_empty = sum(1 for c in range(max_col) if grid[r][c])
@@ -265,11 +345,10 @@ class TextractService:
                     break
 
         if header_row_idx is None:
-            return None  # completely empty table
+            return None
 
         headers = [grid[header_row_idx][c].strip() for c in range(max_col)]
 
-        # Remove trailing all-empty columns
         while headers and all(
             not grid[r][len(headers) - 1] for r in range(max_row)
         ):
@@ -278,7 +357,6 @@ class TextractService:
         if not headers:
             return None
 
-        # ── Collect data rows ──
         rows: List[List[str]] = []
         for r in range(header_row_idx + 1, max_row):
             row_vals = [grid[r][c].strip() for c in range(len(headers))]
@@ -288,8 +366,9 @@ class TextractService:
         if not rows:
             return None
 
-        # ── Average cell confidence ──
-        confidences = [info["confidence"] for info in cells.values() if info["confidence"] > 0]
+        confidences = [
+            info["confidence"] for info in cells.values() if info["confidence"] > 0
+        ]
         avg_conf = sum(confidences) / len(confidences) if confidences else 0.0
 
         return {
@@ -303,10 +382,6 @@ class TextractService:
     def _get_text(
         self, cell_block: Dict[str, Any], blocks_by_id: Dict[str, Any]
     ) -> str:
-        """
-        Reconstruct the text content of a CELL by following its CHILD
-        relationships to WORD and SELECTION_ELEMENT blocks.
-        """
         words: List[str] = []
         for rel in cell_block.get("Relationships", []):
             if rel["Type"] != "CHILD":
@@ -326,12 +401,6 @@ class TextractService:
     def _get_page_number(
         self, table_block: Dict[str, Any], blocks_by_id: Dict[str, Any]
     ) -> int:
-        """
-        Derive a 0-based page number for the given TABLE block.
-
-        Textract blocks carry a Page field (1-based). If absent, fall back
-        to 0 to guarantee the field is always present in the output.
-        """
         page_1based = table_block.get("Page")
         if page_1based is not None:
             return max(0, int(page_1based) - 1)

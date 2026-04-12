@@ -192,7 +192,16 @@ class DoclingService:
         try:
             total_pages = len(conv_for_meta.document.pages)
         except Exception:
-            total_pages = 0
+            try:
+                import fitz
+
+                d = fitz.open(str(path))
+                try:
+                    total_pages = d.page_count
+                finally:
+                    d.close()
+            except Exception:
+                total_pages = 0
 
         logger.info(
             "Docling: %d tables extracted from %s (%d pages)",

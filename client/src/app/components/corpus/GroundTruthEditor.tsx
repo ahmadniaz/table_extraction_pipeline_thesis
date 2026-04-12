@@ -6,7 +6,9 @@ import { X, Plus, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-reac
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
+import { sharedGetGroundTruth } from '@/lib/sharedGroundTruthGet';
 import * as pdfjsLib from 'pdfjs-dist';
+import './groundTruthPdfTextLayer.css';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -22,6 +24,16 @@ interface GTTable {
   notes: string;
   source?: string;
   confirmed?: boolean;
+  /** Server-persisted audit trail (e.g. manual merge); preserved on confirm. */
+  correction_log?: unknown[];
+}
+
+/** LLM placeholder headers: Column 1, Column 2, … */
+function hasAutoNamedHeaders(headers: string[]): boolean {
+  return (
+    headers.length > 0 &&
+    headers.every((h, i) => h.trim().toLowerCase() === `column ${i + 1}`)
+  );
 }
 
 interface Props {
@@ -29,6 +41,11 @@ interface Props {
   filename: string;
   onClose: () => void;
   onSaved: () => void;
+}
+
+interface DocLabels {
+  complexity_tier: string;
+  is_digital: boolean | null;
 }
 
 const emptyTable = (index: number): GTTable => ({
@@ -46,12 +63,26 @@ function deepCloneTable(h: string[], r: string[][]): OriginalSnap {
   return { headers: [...h], rows: r.map(row => [...row]) };
 }
 
+function normaliseTables(tables: GTTable[]): GTTable[] {
+  return tables.map((tbl, idx) => ({
+    ...tbl,
+    table_index: idx,
+  }));
+}
+
 function PdfPanel({ docId, filename }: { docId: string; filename: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [pageNum, setPageNum] = useState(1);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [scale, setScale] = useState(1.2);
+  const [renderSize, setRenderSize] = useState({ width: 0, height: 0 });
+  const MIN_SCALE = 0.5;
+  const MAX_SCALE = 3.0;
+  const SCALE_STEP = 0.25;
+  const DEFAULT_SCALE = 1.2;
 
   useEffect(() => {
     let cancelled = false;
@@ -78,21 +109,46 @@ function PdfPanel({ docId, filename }: { docId: string; filename: string }) {
   useEffect(() => {
     if (!pdf || !canvasRef.current) return;
     let cancelled = false;
+    let textTask: { cancel?: () => void } | null = null;
     (async () => {
       const page = await pdf.getPage(pageNum);
       if (cancelled) return;
       const canvas = canvasRef.current!;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      const vp = page.getViewport({ scale: 1.2 });
+      const vp = page.getViewport({ scale });
       canvas.width = vp.width;
       canvas.height = vp.height;
+      if (!cancelled) setRenderSize({ width: vp.width, height: vp.height });
       await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      if (cancelled) return;
+      const layerEl = textLayerRef.current;
+      if (layerEl) {
+        layerEl.innerHTML = '';
+        try {
+          const textContent = await page.getTextContent();
+          if (cancelled) return;
+          const renderTextLayer = pdfjsLib.renderTextLayer;
+          if (typeof renderTextLayer === 'function') {
+            const task = renderTextLayer({
+              textContentSource: textContent,
+              container: layerEl,
+              viewport: vp,
+              textDivs: [],
+            });
+            textTask = task;
+            await task.promise;
+          }
+        } catch {
+          // Scanned or malformed text streams — canvas still usable
+        }
+      }
     })();
     return () => {
       cancelled = true;
+      textTask?.cancel?.();
     };
-  }, [pdf, pageNum]);
+  }, [pdf, pageNum, scale]);
 
   const total = pdf?.numPages ?? 0;
 
@@ -101,7 +157,38 @@ function PdfPanel({ docId, filename }: { docId: string; filename: string }) {
       <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 truncate">
         {filename}
       </div>
-      <div className="flex-1 overflow-auto flex items-start justify-center p-3">
+      <div className="px-3 py-1.5 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-2 bg-white/80 dark:bg-slate-900/80">
+        <button
+          type="button"
+          disabled={!pdf || scale <= MIN_SCALE}
+          onClick={() => setScale(s => Math.max(MIN_SCALE, +(s - SCALE_STEP).toFixed(2)))}
+          className="px-2 py-0.5 text-sm rounded border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+          aria-label="Zoom out"
+        >
+          −
+        </button>
+        <span className="text-xs text-slate-600 dark:text-slate-400 tabular-nums min-w-[3rem] text-center">
+          {Math.round(scale * 100)}%
+        </span>
+        <button
+          type="button"
+          disabled={!pdf || scale >= MAX_SCALE}
+          onClick={() => setScale(s => Math.min(MAX_SCALE, +(s + SCALE_STEP).toFixed(2)))}
+          className="px-2 py-0.5 text-sm rounded border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+          aria-label="Zoom in"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          disabled={!pdf || Math.abs(scale - DEFAULT_SCALE) < 0.001}
+          onClick={() => setScale(DEFAULT_SCALE)}
+          className="px-2 py-0.5 text-xs rounded border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+        >
+          Reset
+        </button>
+      </div>
+      <div className="flex-1 overflow-auto flex flex-col min-h-0 w-full p-3">
         {loading && (
           <div className="flex flex-col items-center gap-2 py-12 text-slate-500">
             <Loader2 className="w-8 h-8 animate-spin" />
@@ -112,7 +199,18 @@ function PdfPanel({ docId, filename }: { docId: string; filename: string }) {
           <p className="text-xs text-red-600 dark:text-red-400 p-4 text-center">{err}</p>
         )}
         {!loading && !err && (
-          <canvas ref={canvasRef} className="shadow-md max-w-full h-auto" />
+          <div className="overflow-auto flex-1 w-full min-h-0">
+            <div
+              className="relative shadow-md"
+              style={{
+                width: renderSize.width || undefined,
+                height: renderSize.height || undefined,
+              }}
+            >
+              <canvas ref={canvasRef} className="block" style={{ display: 'block' }} />
+              <div ref={textLayerRef} className="textLayer ground-truth-pdf-text-layer" />
+            </div>
+          </div>
         )}
       </div>
       {total > 1 && (
@@ -147,36 +245,162 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
   const [tables, setTables] = useState<GTTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [docLabels, setDocLabels] = useState<DocLabels | null>(null);
+  const [docLabelsLoading, setDocLabelsLoading] = useState(true);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [mergingTableId, setMergingTableId] = useState<string | null>(null);
+  const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
+  const [isMerging, setIsMerging] = useState(false);
+  const [flashSurvivorId, setFlashSurvivorId] = useState<string | null>(null);
   const originalsRef = useRef<Map<number, OriginalSnap>>(new Map());
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    axios
-      .get(`${API}/api/ground-truth/${docId}`)
+    if (!flashSurvivorId) return;
+    const timer = window.setTimeout(() => setFlashSurvivorId(null), 500);
+    return () => window.clearTimeout(timer);
+  }, [flashSurvivorId]);
+
+  const resetTables = useCallback((next: GTTable[], nextActiveIdx: number) => {
+    const norm = normaliseTables(next);
+    setTables(norm);
+    const m = new Map<number, OriginalSnap>();
+    for (const tbl of norm) {
+      m.set(tbl.table_index, deepCloneTable(tbl.headers, tbl.rows));
+    }
+    originalsRef.current = m;
+    setActiveIdx(Math.max(0, Math.min(nextActiveIdx, norm.length - 1)));
+  }, []);
+
+  useEffect(() => {
+    fetchedRef.current = false;
+    setMergingTableId(null);
+    setMergeTargetId(null);
+  }, [docId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDocLabelsLoading(true);
+    (async () => {
+      try {
+        const { data } = await axios.get<DocLabels>(`${API}/api/documents/${docId}`);
+        if (!cancelled) {
+          setDocLabels({
+            complexity_tier: data.complexity_tier || 'unconfirmed',
+            is_digital: data.is_digital ?? null,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setDocLabels({ complexity_tier: 'unconfirmed', is_digital: null });
+        }
+      } finally {
+        if (!cancelled) setDocLabelsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [docId]);
+
+  useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+    let cancelled = false;
+    setLoading(true);
+    sharedGetGroundTruth(docId)
       .then(r => {
-        const data: GTTable[] = r.data.length
-          ? r.data.map((t: GTTable & { notes?: string | null }) => ({
+        const raw = r.data as GTTable[];
+        const data: GTTable[] = raw.length
+          ? raw.map((t: GTTable & { notes?: string | null; correction_log?: unknown[] }) => ({
               ...t,
               notes: t.notes ?? '',
               source: t.source ?? 'manual',
               confirmed: t.confirmed ?? false,
+              correction_log: Array.isArray(t.correction_log) ? t.correction_log : [],
             }))
           : [emptyTable(0)];
-        setTables(data);
-        setActiveIdx(0);
-        const m = new Map<number, OriginalSnap>();
-        for (const tbl of data) {
-          m.set(tbl.table_index, deepCloneTable(tbl.headers, tbl.rows));
+        if (!cancelled) {
+          resetTables(data, 0);
         }
-        originalsRef.current = m;
       })
       .catch(() => {
-        const t = emptyTable(0);
-        setTables([t]);
-        originalsRef.current = new Map([[0, deepCloneTable(t.headers, t.rows)]]);
+        if (!cancelled) {
+          resetTables([emptyTable(0)], 0);
+        }
       })
-      .finally(() => setLoading(false));
-  }, [docId]);
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [docId, resetTables]);
+
+  const reloadGroundTruthFromServer = useCallback(
+    async (preferredActiveIndex: number) => {
+      const { data } = await axios.get<
+        (GTTable & { notes?: string | null; id?: string })[]
+      >(`${API}/api/ground-truth/${docId}`);
+      const mapped: GTTable[] = data.map(t => ({
+        ...t,
+        notes: t.notes ?? '',
+        source: t.source ?? 'manual',
+        confirmed: t.confirmed ?? false,
+        correction_log: Array.isArray(t.correction_log) ? t.correction_log : [],
+      }));
+      resetTables(mapped, Math.max(0, Math.min(preferredActiveIndex, mapped.length - 1)));
+    },
+    [docId, resetTables]
+  );
+
+  const handleConfirmMerge = async () => {
+    if (!mergingTableId || !mergeTargetId) return;
+    setIsMerging(true);
+    try {
+      const { data: merged } = await axios.post<{
+        id: string;
+        table_index: number;
+      }>(`${API}/api/documents/${docId}/ground-truth/merge`, {
+        primary_table_id: mergingTableId,
+        secondary_table_id: mergeTargetId,
+      });
+      setMergingTableId(null);
+      setMergeTargetId(null);
+      await reloadGroundTruthFromServer(merged.table_index);
+      setFlashSurvivorId(merged.id);
+      toast.success('Tables merged');
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: unknown }; message?: string };
+      const detail =
+        typeof ax.response?.data === 'object' && ax.response?.data && 'detail' in ax.response.data
+          ? String((ax.response.data as { detail: string }).detail)
+          : ax.message ?? 'Merge failed';
+      console.error('Merge failed:', err);
+      toast.error(detail);
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
+  const deleteTableAt = useCallback(
+    (arrayIndex: number) => {
+      if (tables.length === 1) {
+        resetTables([emptyTable(0)], 0);
+        return;
+      }
+      const next = tables.filter((_, i) => i !== arrayIndex);
+      let na = activeIdx;
+      if (arrayIndex < activeIdx) na = activeIdx - 1;
+      else if (arrayIndex === activeIdx) na = Math.min(activeIdx, next.length - 1);
+      resetTables(next, na);
+    },
+    [tables, activeIdx, resetTables]
+  );
+
+  const addTable = useCallback(() => {
+    resetTables([...tables, emptyTable(0)], tables.length);
+  }, [tables, resetTables]);
 
   const t = tables[activeIdx];
   const showSeedBanner =
@@ -238,16 +462,6 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
   const addRow = () => t && updateTable({ rows: [...t.rows, Array(t.headers.length).fill('')] });
   const removeRow = (ri: number) => t && updateTable({ rows: t.rows.filter((_, i) => i !== ri) });
 
-  const addTable = () => {
-    setTables(prev => {
-      const nextIdx = prev.length ? Math.max(...prev.map(x => x.table_index), -1) + 1 : 0;
-      const next = emptyTable(nextIdx);
-      originalsRef.current.set(nextIdx, deepCloneTable(next.headers, next.rows));
-      setActiveIdx(prev.length);
-      return [...prev, next];
-    });
-  };
-
   const buildCorrectionLogForTable = (tbl: GTTable) => {
     const o = originalsRef.current.get(tbl.table_index);
     if (!o) return [];
@@ -266,15 +480,30 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
   };
 
   const confirm = async () => {
+    if (docLabelsLoading || !docLabels) {
+      toast.error('Document settings are still loading. Try again in a moment.');
+      return;
+    }
+    if (docLabels.complexity_tier === 'unconfirmed') {
+      toast.error('Choose a complexity tier (Low, Medium, or High) before confirming ground truth.');
+      return;
+    }
     setSaving(true);
     try {
+      await axios.patch(`${API}/api/documents/${docId}/tier`, {
+        complexity_tier: docLabels.complexity_tier,
+        is_digital: docLabels.is_digital,
+      });
       const payload = {
-        tables: tables.map(tbl => ({
-          table_index: tbl.table_index,
+        tables: tables.map((tbl, idx) => ({
+          table_index: idx,
           headers: tbl.headers,
           rows: tbl.rows,
           notes: tbl.notes || null,
-          correction_log: buildCorrectionLogForTable(tbl),
+          correction_log: [
+            ...(Array.isArray(tbl.correction_log) ? tbl.correction_log : []),
+            ...buildCorrectionLogForTable(tbl),
+          ],
         })),
       };
       await axios.post(`${API}/api/ground-truth/${docId}/confirm`, payload);
@@ -303,6 +532,55 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
                 corrected
               </p>
             )}
+            {docLabels && !docLabelsLoading && (
+              <div className="mt-3 flex flex-wrap items-end gap-3 max-w-2xl">
+                <label className="flex flex-col gap-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Complexity tier
+                  <select
+                    value={docLabels.complexity_tier}
+                    onChange={e =>
+                      setDocLabels(prev =>
+                        prev ? { ...prev, complexity_tier: e.target.value } : prev
+                      )
+                    }
+                    className="text-xs font-normal rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="unconfirmed">Unconfirmed (required before confirm)</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  PDF type
+                  <select
+                    value={
+                      docLabels.is_digital === null ? '' : docLabels.is_digital ? 'digital' : 'scanned'
+                    }
+                    onChange={e => {
+                      const v = e.target.value;
+                      setDocLabels(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              is_digital: v === '' ? null : v === 'digital',
+                            }
+                          : prev
+                      );
+                    }}
+                    className="text-xs font-normal rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Auto (from upload heuristic)</option>
+                    <option value="digital">Digital</option>
+                    <option value="scanned">Scanned / OCR</option>
+                  </select>
+                </label>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 pb-1 max-w-xs leading-snug">
+                  Tier and PDF type label this document in evaluation results. Values are detected on upload; change here
+                  if they are wrong.
+                </p>
+              </div>
+            )}
           </div>
           <button type="button" onClick={onClose} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800">
             <X className="w-5 h-5 text-slate-500" />
@@ -326,21 +604,64 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
                 </div>
               )}
 
-              <div className="flex items-center gap-2 px-3 pt-3 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+              <div className="flex items-center gap-2 px-3 pt-3 border-b border-slate-200 dark:border-slate-700 overflow-x-auto flex-wrap">
                 {tables.map((tbl, i) => (
-                  <button
-                    key={tbl.table_index}
-                    type="button"
-                    onClick={() => setActiveIdx(i)}
+                  <div
+                    key={tbl.id ?? `idx-${i}`}
                     className={cn(
-                      'px-3 py-1.5 text-sm rounded-t border-b-2 -mb-px whitespace-nowrap transition-colors',
+                      'inline-flex items-center shrink-0 rounded-t border-b-2 -mb-px transition-all duration-500',
                       i === activeIdx
-                        ? 'border-indigo-500 text-indigo-700 dark:text-indigo-300 font-medium'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                        ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20'
+                        : 'border-transparent',
+                      tbl.id && flashSurvivorId === tbl.id
+                        ? 'border-green-400 shadow-[0_0_0_2px_rgba(74,222,128,0.45)]'
+                        : ''
                     )}
                   >
-                    Table {tbl.table_index}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveIdx(i)}
+                      className={cn(
+                        'px-2.5 py-1.5 text-sm whitespace-nowrap',
+                        i === activeIdx
+                          ? 'text-indigo-700 dark:text-indigo-300 font-medium'
+                          : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      )}
+                    >
+                      Table {tbl.table_index + 1}
+                    </button>
+                    {tables.length > 1 && tbl.id && (
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setMergingTableId(tbl.id!);
+                          setMergeTargetId(null);
+                          setActiveIdx(i);
+                        }}
+                        className="px-2 py-0.5 mr-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-600 rounded hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                        title="Merge this table with another table"
+                      >
+                        Merge With →
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (mergingTableId === tbl.id) {
+                          setMergingTableId(null);
+                          setMergeTargetId(null);
+                        }
+                        deleteTableAt(i);
+                      }}
+                      className="p-1 mr-0.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                      aria-label={`Delete table ${tbl.table_index}`}
+                      title="Delete table"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 ))}
                 <button
                   type="button"
@@ -351,10 +672,121 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
                 </button>
               </div>
 
+              {mergingTableId && (
+                <div className="mx-3 mt-2 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 text-sm">
+                  <p className="text-slate-700 dark:text-slate-200 font-medium mb-2">
+                    Select table to merge into this one:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {tables.filter(t => t.id && t.id !== mergingTableId).length === 0 && (
+                      <p className="text-xs text-slate-500">No other saved tables to merge with.</p>
+                    )}
+                    {tables
+                      .filter(t => t.id && t.id !== mergingTableId)
+                      .map(tbl => {
+                        const labelPreview = hasAutoNamedHeaders(tbl.headers)
+                          ? '[unnamed columns]'
+                          : tbl.headers
+                              .slice(0, 3)
+                              .join(', ')
+                              .trim() || '…';
+                        const short =
+                          labelPreview.length > 72 ? `${labelPreview.slice(0, 72)}…` : labelPreview;
+                        return (
+                          <button
+                            key={tbl.id}
+                            type="button"
+                            onClick={() => setMergeTargetId(tbl.id!)}
+                            className={cn(
+                              'px-2 py-1.5 text-xs rounded border text-left max-w-full',
+                              mergeTargetId === tbl.id
+                                ? 'border-indigo-500 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-900 dark:text-indigo-100'
+                                : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80'
+                            )}
+                          >
+                            <span className="font-medium">Table {tbl.table_index + 1}:</span>{' '}
+                            {short}
+                            {hasAutoNamedHeaders(tbl.headers) && (
+                              <span className="ml-1 inline-flex items-center bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-200 text-[10px] rounded px-1">
+                                ⚠ auto-named headers
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+                  {mergeTargetId && (() => {
+                    const a = tables.find(x => x.id === mergingTableId);
+                    const b = tables.find(x => x.id === mergeTargetId);
+                    if (!a || !b) return null;
+                    const primary = a.table_index <= b.table_index ? a : b;
+                    const secondary = a.table_index <= b.table_index ? b : a;
+                    return (
+                      <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800 space-y-2">
+                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                          Merge Table {secondary.table_index + 1} into Table {primary.table_index + 1}?
+                          Table {primary.table_index + 1}&apos;s headers will be used for the merged
+                          result.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={isMerging}
+                            onClick={handleConfirmMerge}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {isMerging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                            Confirm merge
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isMerging}
+                            onClick={() => {
+                              setMergeTargetId(null);
+                            }}
+                            className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-600"
+                          >
+                            Clear target
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isMerging}
+                            onClick={() => {
+                              setMergingTableId(null);
+                              setMergeTargetId(null);
+                            }}
+                            className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {!mergeTargetId && (
+                    <button
+                      type="button"
+                      className="mt-2 text-xs text-slate-600 dark:text-slate-400 hover:underline"
+                      onClick={() => {
+                        setMergingTableId(null);
+                        setMergeTargetId(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="flex-1 overflow-y-auto p-3 space-y-3">
                 {t && (
                   <>
                     <div>
+                      {hasAutoNamedHeaders(t.headers) && (
+                        <div className="mb-2 inline-flex items-center gap-1 bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-200 text-xs rounded px-2 py-0.5">
+                          <span aria-hidden>⚠</span> auto-named headers
+                        </div>
+                      )}
                       <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                         Notes (optional)
                       </label>

@@ -176,7 +176,14 @@ EXTRACTION_SCHEMA: Dict[str, Any] = {
                     "table_type": {"type": "string"},
                     "confidence_score": {"type": "number"},
                 },
-                "required": ["headers", "rows"],
+                # OpenAI strict json_schema requires `required` to list every key in `properties`.
+                "required": [
+                    "headers",
+                    "rows",
+                    "page_number",
+                    "table_type",
+                    "confidence_score",
+                ],
                 "additionalProperties": False,
             },
         },
@@ -192,7 +199,8 @@ EXTRACTION_SCHEMA: Dict[str, Any] = {
         },
         "extraction_notes": {"type": ["string", "null"]},
     },
-    "required": ["tables", "document_metadata"],
+    # Same strict-schema rule at root: every property key must appear in `required`.
+    "required": ["tables", "document_metadata", "extraction_notes"],
     "additionalProperties": False,
 }
 

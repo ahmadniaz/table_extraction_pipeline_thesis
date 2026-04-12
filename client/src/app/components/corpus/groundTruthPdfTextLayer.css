@@ -1,0 +1,28 @@
+/* Minimal pdf.js text-layer rules (avoid importing pdf_viewer.css — it pulls SVG url() assets Next can't bundle). */
+
+.ground-truth-pdf-text-layer.textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0.25;
+  line-height: 1;
+  -webkit-text-size-adjust: none;
+  -moz-text-size-adjust: none;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  z-index: 2;
+}
+
+.ground-truth-pdf-text-layer.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.ground-truth-pdf-text-layer.textLayer ::selection {
+  background: rgba(0, 0, 255, 0.3);
+  color: transparent;
+}

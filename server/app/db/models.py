@@ -12,7 +12,7 @@ class Document(Base):
     __tablename__ = 'documents'
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     filename = Column(String, nullable=False)
-    complexity_tier = Column(String, nullable=False)  # 'low' | 'medium' | 'high'
+    complexity_tier = Column(String, nullable=False)  # 'low' | 'medium' | 'high' | 'unconfirmed'
     page_count = Column(Integer)
     is_digital = Column(Boolean)  # True = digital PDF, False = scanned
     uploaded_at = Column(DateTime, server_default=text('now()'), nullable=False)

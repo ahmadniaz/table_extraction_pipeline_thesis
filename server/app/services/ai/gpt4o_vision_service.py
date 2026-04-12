@@ -347,18 +347,31 @@ Return only the JSON object matching the required schema."""
             return {"success": False, "error": "GPT-5 service not available"}
         try:
             doc = fitz.open(pdf_path)
-            total_pages = len(doc)
-            selected = (
-                self._select_representative_pages(total_pages, max_pages, pdf_path)
-                if total_pages > max_pages
-                else list(range(total_pages))
-            )
-            images = [
-                img
-                for p in selected
-                if (img := self._convert_page_to_optimized_image(doc, p)) is not None
-            ]
-            doc.close()
+            try:
+                total_pages = len(doc)
+                if total_pages > max_pages:
+                    selected = self._select_representative_pages(
+                        total_pages, max_pages, pdf_path
+                    )
+                    logger.warning(
+                        "GPT-5: document %s has %d pages; only %d selected for analysis. "
+                        "Tables on unselected pages will not be extracted.",
+                        pdf_path,
+                        total_pages,
+                        len(selected),
+                    )
+                else:
+                    selected = list(range(total_pages))
+                images = [
+                    img
+                    for p in selected
+                    if (
+                        img := self._convert_page_to_optimized_image(doc, p)
+                    )
+                    is not None
+                ]
+            finally:
+                doc.close()
             if not images:
                 return {"success": False, "error": "Failed to render any pages to images"}
             return self._extract_tables_with_vision(images, selected)
@@ -500,8 +513,8 @@ Return only the JSON object matching the required schema."""
                 text = text[:-3]
             text = text.strip()
 
-            result = json.loads(text)
-            tables_raw = result.get("tables", [])
+            parsed_json = json.loads(text)
+            tables_raw = parsed_json.get("tables", [])
 
             if not tables_raw:
                 return {"success": False, "error": "No tables found in model response"}
@@ -535,7 +548,7 @@ Return only the JSON object matching the required schema."""
             if not processed:
                 return {"success": False, "error": "All tables were empty after normalisation"}
 
-            result: Dict[str, Any] = {
+            out: Dict[str, Any] = {
                 "success": True,
                 "tables": processed,
                 "extraction_metadata": {
@@ -544,12 +557,11 @@ Return only the JSON object matching the required schema."""
                 },
             }
 
-            # Propagate document_metadata when the shared schema provides it
-            doc_meta = result_json.get("document_metadata")
+            doc_meta = parsed_json.get("document_metadata")
             if doc_meta:
-                result["document_metadata"] = doc_meta
+                out["document_metadata"] = doc_meta
 
-            return result
+            return out
 
         except json.JSONDecodeError as exc:
             logger.error("JSON decode failed (%s): %s — preview: %.200s", method, exc, content)
@@ -612,56 +624,7 @@ Return only the JSON object matching the required schema."""
     def merge_similar_tables(
         self, tables: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """Merge tables with identical or near-identical headers."""
-        if len(tables) <= 1:
-            return tables
-        try:
-            groups: List[List[Dict[str, Any]]] = []
-            used: set = set()
-            for i, t in enumerate(tables):
-                if i in used:
-                    continue
-                group = [t]
-                used.add(i)
-                for j, other in enumerate(tables):
-                    if j not in used and self._are_tables_mergeable(t, other):
-                        group.append(other)
-                        used.add(j)
-                groups.append(group)
-            merged = [
-                g[0] if len(g) == 1 else self._merge_table_group(g)
-                for g in groups
-            ]
-            logger.info("merge_similar_tables: %d → %d", len(tables), len(merged))
-            return merged
-        except Exception as exc:
-            logger.error("Table merge failed: %s", exc)
-            return tables
+        """Delegate to the shared evaluation merge policy (same as EvaluationRunner)."""
+        from app.services.evaluation.table_merging import merge_similar_tables_global
 
-    def _are_tables_mergeable(
-        self, t1: Dict[str, Any], t2: Dict[str, Any]
-    ) -> bool:
-        h1, h2 = t1.get("headers", []), t2.get("headers", [])
-        if h1 == h2:
-            return True
-        if len(h1) == len(h2) and h1:
-            n = min(10, len(h1))
-            return sum(a == b for a, b in zip(h1[:n], h2[:n])) >= n * 0.7
-        return False
-
-    def _merge_table_group(
-        self, group: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        base = group[0]
-        rows = list(base.get("rows", []))
-        for t in group[1:]:
-            rows.extend(t.get("rows", []))
-        return {
-            "headers": base.get("headers", []),
-            "rows": rows,
-            "extractor": "gpt5_merged",
-            "metadata": {
-                "merged_from": len(group),
-                "timestamp": datetime.now().isoformat(),
-            },
-        }
+        return merge_similar_tables_global(tables)

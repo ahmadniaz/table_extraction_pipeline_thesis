@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { BookOpen, RefreshCw } from 'lucide-react';
 import DocumentUploadZone, { type UploadedDocumentPayload } from '@/app/components/corpus/DocumentUploadZone';
@@ -38,6 +38,8 @@ export default function CorpusPage() {
   const [rowSeed, setRowSeed] = useState<Record<string, RowSeedState>>({});
   const [loading, setLoading] = useState(true);
   const [editorDoc, setEditorDoc] = useState<Document | null>(null);
+  const editorDocIdRef = useRef<string | null>(null);
+  editorDocIdRef.current = editorDoc?.id ?? null;
 
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
@@ -73,7 +75,7 @@ export default function CorpusPage() {
           delete next[doc.id];
           return next;
         });
-        const tier = ('complexity_tier' in doc ? doc.complexity_tier : 'medium') as Document['complexity_tier'];
+        const tier = ('complexity_tier' in doc ? doc.complexity_tier : 'unconfirmed') as Document['complexity_tier'];
         setEditorDoc({
           id: doc.id,
           filename: doc.filename,
@@ -95,12 +97,42 @@ export default function CorpusPage() {
     }
   }, [fetchDocuments]);
 
+  const openEditorFromPayload = useCallback((doc: UploadedDocumentPayload) => {
+    setEditorDoc({
+      id: doc.id,
+      filename: doc.filename,
+      complexity_tier: (doc.complexity_tier ?? 'unconfirmed') as Document['complexity_tier'],
+      page_count: doc.page_count,
+      is_digital: doc.is_digital,
+      uploaded_at: doc.uploaded_at,
+    });
+  }, []);
+
   const handleUploaded = useCallback(
     async (doc: UploadedDocumentPayload) => {
       await fetchDocuments();
-      await runSeedForDoc(doc);
+      const seed = doc.seed;
+      if (seed?.transient_failure) {
+        setRowSeed(prev => ({ ...prev, [doc.id]: 'claude_unavailable' }));
+        return;
+      }
+      if (seed && seed.success === false && seed.error) {
+        setRowSeed(prev => ({ ...prev, [doc.id]: 'seed_failed' }));
+        return;
+      }
+      const n = seed?.tables_seeded ?? 0;
+      if (n > 0) {
+        setRowSeed(prev => {
+          const next = { ...prev };
+          delete next[doc.id];
+          return next;
+        });
+        openEditorFromPayload(doc);
+      } else {
+        setRowSeed(prev => ({ ...prev, [doc.id]: 'no_tables' }));
+      }
     },
-    [fetchDocuments, runSeedForDoc]
+    [fetchDocuments, openEditorFromPayload]
   );
 
   const handleRetrySeed = useCallback(
@@ -109,6 +141,20 @@ export default function CorpusPage() {
     },
     [runSeedForDoc]
   );
+
+  const handleCloseEditor = useCallback(() => setEditorDoc(null), []);
+
+  const handleEditorSaved = useCallback(() => {
+    const id = editorDocIdRef.current;
+    if (id) {
+      setRowSeed(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
+    void fetchDocuments();
+  }, [fetchDocuments]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
@@ -119,7 +165,7 @@ export default function CorpusPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Document Corpus</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Upload PDFs, review automated seed extraction, confirm ground truth, then evaluate
+            Upload PDFs — default tool extraction and ground-truth seed run on the server — confirm in the editor, then use Evaluate on each document
           </p>
         </div>
       </div>
@@ -165,6 +211,7 @@ export default function CorpusPage() {
               onRefresh={fetchDocuments}
               onRetrySeed={handleRetrySeed}
               onOpenEditor={setEditorDoc}
+              onCloseEditor={handleCloseEditor}
             />
           )}
         </div>
@@ -172,18 +219,11 @@ export default function CorpusPage() {
 
       {editorDoc && (
         <GroundTruthEditor
+          key={editorDoc.id}
           docId={editorDoc.id}
           filename={editorDoc.filename}
-          onClose={() => setEditorDoc(null)}
-          onSaved={() => {
-            const id = editorDoc.id;
-            setRowSeed(prev => {
-              const next = { ...prev };
-              delete next[id];
-              return next;
-            });
-            fetchDocuments();
-          }}
+          onClose={handleCloseEditor}
+          onSaved={handleEditorSaved}
         />
       )}
     </div>

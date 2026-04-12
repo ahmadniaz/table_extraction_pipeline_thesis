@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Eye, Loader2 } from 'lucide-react';
 import ExtractionComparisonModal from './ExtractionComparisonModal';
 
@@ -29,6 +29,13 @@ function fmt(v: number | null, d = 3) { return v != null ? v.toFixed(d) : '—';
 export default function DocumentDrillDown({ documents, resultsByDoc }: Props) {
   const [selectedDocId, setSelectedDocId] = useState<string>(documents[0]?.id ?? '');
   const [comparison, setComparison] = useState<{ tool: string; table: number } | null>(null);
+
+  useEffect(() => {
+    if (!documents.length) return;
+    if (!documents.some(d => d.id === selectedDocId)) {
+      setSelectedDocId(documents[0].id);
+    }
+  }, [documents, selectedDocId]);
 
   const selectedDoc = documents.find(d => d.id === selectedDocId);
   const rows = resultsByDoc[selectedDocId] ?? [];
