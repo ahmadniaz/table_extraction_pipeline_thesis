@@ -72,6 +72,14 @@ _PG_ALTER_STATEMENTS = [
       WHEN duplicate_column THEN NULL;
     END $$;
     """,
+    """
+    DO $$
+    BEGIN
+      ALTER TABLE extraction_results ADD COLUMN is_draft BOOLEAN NOT NULL DEFAULT false;
+    EXCEPTION
+      WHEN duplicate_column THEN NULL;
+    END $$;
+    """,
 ]
 
 

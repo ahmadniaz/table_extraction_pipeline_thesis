@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Plus, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Plus, Trash2, Loader2, ChevronLeft, ChevronRight, Undo2 } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,8 @@ if (typeof window !== 'undefined') {
 
 interface GTTable {
   id?: string;
+  /** Stable client-only id for tables not yet persisted (used for edit baselines). */
+  clientKey?: string;
   table_index: number;
   headers: string[];
   rows: string[][];
@@ -48,7 +50,12 @@ interface DocLabels {
   is_digital: boolean | null;
 }
 
+function newClientKey(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `ck-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 const emptyTable = (index: number): GTTable => ({
+  clientKey: newClientKey(),
   table_index: index,
   headers: ['Col 1', 'Col 2'],
   rows: [['', '']],
@@ -57,10 +64,40 @@ const emptyTable = (index: number): GTTable => ({
   confirmed: false,
 });
 
+/** Baseline snapshots must be keyed by stable identity — not table_index (reorders on delete). */
+function baselineKey(tbl: GTTable): string {
+  if (tbl.id) return `id:${tbl.id}`;
+  if (tbl.clientKey) return `ck:${tbl.clientKey}`;
+  return `idx:${tbl.table_index}`;
+}
+
 type OriginalSnap = { headers: string[]; rows: string[][] };
 
 function deepCloneTable(h: string[], r: string[][]): OriginalSnap {
   return { headers: [...h], rows: r.map(row => [...row]) };
+}
+
+/** Pad or trim so row length matches `len` (orphan cells beyond headers are dropped for display/storage). */
+function padRowToLength(row: string[] | undefined, len: number): string[] {
+  const r = [...(row || [])];
+  while (r.length < len) r.push('');
+  return r.slice(0, len);
+}
+
+/**
+ * When extraction has more cells than headers (or fewer), align counts: add placeholder headers
+ * for extra cells, pad short rows. Prevents ghost columns in the grid.
+ */
+function reconcileColumnCounts(tbl: GTTable): GTTable {
+  const maxR = tbl.rows.length ? Math.max(0, ...tbl.rows.map(r => r.length)) : 0;
+  const hLen = tbl.headers.length;
+  const target = Math.max(hLen, maxR, 1);
+  const headers = [...tbl.headers];
+  while (headers.length < target) {
+    headers.push(`Col ${headers.length + 1}`);
+  }
+  const rows = tbl.rows.map(r => padRowToLength(r, headers.length));
+  return { ...tbl, headers, rows };
 }
 
 function normaliseTables(tables: GTTable[]): GTTable[] {
@@ -68,6 +105,25 @@ function normaliseTables(tables: GTTable[]): GTTable[] {
     ...tbl,
     table_index: idx,
   }));
+}
+
+/** First table (by order) whose server log still has an undoable merge snapshot. */
+function survivorIdWithMergeUndo(mapped: GTTable[]): string | null {
+  for (const t of mapped) {
+    if (!t.id || !Array.isArray(t.correction_log)) continue;
+    if (
+      t.correction_log.some(
+        e =>
+          typeof e === 'object' &&
+          e !== null &&
+          'type' in e &&
+          (e as { type?: string }).type === 'merge_undo'
+      )
+    ) {
+      return t.id;
+    }
+  }
+  return null;
 }
 
 function PdfPanel({ docId, filename }: { docId: string; filename: string }) {
@@ -252,7 +308,11 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
   const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
   const [isMerging, setIsMerging] = useState(false);
   const [flashSurvivorId, setFlashSurvivorId] = useState<string | null>(null);
-  const originalsRef = useRef<Map<number, OriginalSnap>>(new Map());
+  /** Survivor table id after last merge — undo pops merge stack on the server for this row. */
+  const [mergeUndoSurvivorId, setMergeUndoSurvivorId] = useState<string | null>(null);
+  /** When set, overrides the diff-based correction count for display (this session only). */
+  const [manualCellsCorrected, setManualCellsCorrected] = useState<number | null>(null);
+  const originalsRef = useRef<Map<string, OriginalSnap>>(new Map());
   const fetchedRef = useRef(false);
 
   useEffect(() => {
@@ -261,21 +321,46 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
     return () => window.clearTimeout(timer);
   }, [flashSurvivorId]);
 
-  const resetTables = useCallback((next: GTTable[], nextActiveIdx: number) => {
-    const norm = normaliseTables(next);
-    setTables(norm);
-    const m = new Map<number, OriginalSnap>();
-    for (const tbl of norm) {
-      m.set(tbl.table_index, deepCloneTable(tbl.headers, tbl.rows));
-    }
-    originalsRef.current = m;
-    setActiveIdx(Math.max(0, Math.min(nextActiveIdx, norm.length - 1)));
-  }, []);
+  /**
+   * @param baselineMode `server` — replace all edit baselines (initial load, API reload).
+   *   `preserve` — keep baselines for tables that still exist (delete/add tab locally).
+   */
+  const resetTables = useCallback(
+    (next: GTTable[], nextActiveIdx: number, baselineMode: 'server' | 'preserve' = 'server') => {
+      const norm = normaliseTables(next.map(reconcileColumnCounts));
+      setTables(norm);
+      if (baselineMode === 'server') {
+        const m = new Map<string, OriginalSnap>();
+        for (const tbl of norm) {
+          m.set(baselineKey(tbl), deepCloneTable(tbl.headers, tbl.rows));
+        }
+        originalsRef.current = m;
+      } else {
+        const m = new Map<string, OriginalSnap>(originalsRef.current);
+        const seen = new Set<string>();
+        for (const tbl of norm) {
+          const k = baselineKey(tbl);
+          seen.add(k);
+          if (!m.has(k)) {
+            m.set(k, deepCloneTable(tbl.headers, tbl.rows));
+          }
+        }
+        for (const key of [...m.keys()]) {
+          if (!seen.has(key)) m.delete(key);
+        }
+        originalsRef.current = m;
+      }
+      setActiveIdx(Math.max(0, Math.min(nextActiveIdx, norm.length - 1)));
+    },
+    []
+  );
 
   useEffect(() => {
     fetchedRef.current = false;
     setMergingTableId(null);
     setMergeTargetId(null);
+    setMergeUndoSurvivorId(null);
+    setManualCellsCorrected(null);
   }, [docId]);
 
   useEffect(() => {
@@ -322,11 +407,13 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
           : [emptyTable(0)];
         if (!cancelled) {
           resetTables(data, 0);
+          setMergeUndoSurvivorId(survivorIdWithMergeUndo(data));
         }
       })
       .catch(() => {
         if (!cancelled) {
           resetTables([emptyTable(0)], 0);
+          setMergeUndoSurvivorId(null);
         }
       })
       .finally(() => {
@@ -338,7 +425,7 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
   }, [docId, resetTables]);
 
   const reloadGroundTruthFromServer = useCallback(
-    async (preferredActiveIndex: number) => {
+    async (preferredActiveIndex: number, preferredTableId?: string | null) => {
       const { data } = await axios.get<
         (GTTable & { notes?: string | null; id?: string })[]
       >(`${API}/api/ground-truth/${docId}`);
@@ -349,7 +436,13 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
         confirmed: t.confirmed ?? false,
         correction_log: Array.isArray(t.correction_log) ? t.correction_log : [],
       }));
-      resetTables(mapped, Math.max(0, Math.min(preferredActiveIndex, mapped.length - 1)));
+      let idx = Math.max(0, Math.min(preferredActiveIndex, mapped.length - 1));
+      if (preferredTableId) {
+        const found = mapped.findIndex(t => t.id === preferredTableId);
+        if (found >= 0) idx = found;
+      }
+      resetTables(mapped, idx);
+      setMergeUndoSurvivorId(survivorIdWithMergeUndo(mapped));
     },
     [docId, resetTables]
   );
@@ -367,7 +460,7 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
       });
       setMergingTableId(null);
       setMergeTargetId(null);
-      await reloadGroundTruthFromServer(merged.table_index);
+      await reloadGroundTruthFromServer(0, merged.id);
       setFlashSurvivorId(merged.id);
       toast.success('Tables merged');
     } catch (err: unknown) {
@@ -383,23 +476,47 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
     }
   };
 
+  const handleUndoMerge = async () => {
+    if (!mergeUndoSurvivorId) return;
+    setIsMerging(true);
+    try {
+      const { data } = await axios.post<{
+        survivor_table_id: string;
+        can_undo_more: boolean;
+      }>(`${API}/api/documents/${docId}/ground-truth/merge/undo`, {
+        survivor_table_id: mergeUndoSurvivorId,
+      });
+      await reloadGroundTruthFromServer(0, data.survivor_table_id);
+      toast.success('Merge undone');
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: unknown }; message?: string };
+      const detail =
+        typeof ax.response?.data === 'object' && ax.response?.data && 'detail' in ax.response.data
+          ? String((ax.response.data as { detail: string }).detail)
+          : ax.message ?? 'Undo failed';
+      toast.error(detail);
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
   const deleteTableAt = useCallback(
     (arrayIndex: number) => {
       if (tables.length === 1) {
-        resetTables([emptyTable(0)], 0);
+        resetTables([emptyTable(0)], 0, 'server');
         return;
       }
       const next = tables.filter((_, i) => i !== arrayIndex);
       let na = activeIdx;
       if (arrayIndex < activeIdx) na = activeIdx - 1;
       else if (arrayIndex === activeIdx) na = Math.min(activeIdx, next.length - 1);
-      resetTables(next, na);
+      resetTables(next, na, 'preserve');
     },
     [tables, activeIdx, resetTables]
   );
 
   const addTable = useCallback(() => {
-    resetTables([...tables, emptyTable(0)], tables.length);
+    resetTables([...tables, emptyTable(0)], tables.length, 'preserve');
   }, [tables, resetTables]);
 
   const t = tables[activeIdx];
@@ -410,26 +527,36 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
     let n = 0;
     const origMap = originalsRef.current;
     for (const tbl of tables) {
-      const o = origMap.get(tbl.table_index);
+      const o = origMap.get(baselineKey(tbl));
       if (!o) continue;
+      const oh = padRowToLength(o.headers, tbl.headers.length);
       tbl.headers.forEach((h, ci) => {
-        if (h !== (o.headers[ci] ?? '')) n += 1;
+        if (h !== (oh[ci] ?? '')) n += 1;
       });
       tbl.rows.forEach((row, ri) => {
-        row.forEach((cell, ci) => {
-          if (cell !== (o.rows[ri]?.[ci] ?? '')) n += 1;
+        const r = padRowToLength(row, tbl.headers.length);
+        const ob = padRowToLength(o.rows[ri], tbl.headers.length);
+        tbl.headers.forEach((_, ci) => {
+          if (r[ci] !== (ob[ci] ?? '')) n += 1;
         });
       });
     }
     return n;
   }, [tables]);
 
+  const displayedCellsCorrected =
+    manualCellsCorrected !== null ? manualCellsCorrected : correctionCount;
+
   const isCellEdited = useCallback(
     (tbl: GTTable, ri: number, ci: number, val: string) => {
-      const o = originalsRef.current.get(tbl.table_index);
+      const o = originalsRef.current.get(baselineKey(tbl));
       if (!o) return false;
-      if (ri === -1) return val !== (o.headers[ci] ?? '');
-      return val !== (o.rows[ri]?.[ci] ?? '');
+      if (ri === -1) {
+        const oh = padRowToLength(o.headers, tbl.headers.length);
+        return val !== (oh[ci] ?? '');
+      }
+      const orow = padRowToLength(o.rows[ri], tbl.headers.length);
+      return val !== (orow[ci] ?? '');
     },
     []
   );
@@ -447,32 +574,60 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
 
   const setCell = (ri: number, ci: number, val: string) => {
     if (!t) return;
-    const rows = t.rows.map((r, i) => (i === ri ? r.map((c, j) => (j === ci ? val : c)) : r));
+    const w = t.headers.length;
+    const rows = t.rows.map((r, i) => {
+      const base = padRowToLength(r, w);
+      if (i !== ri) return base;
+      return base.map((c, j) => (j === ci ? val : c));
+    });
     updateTable({ rows });
   };
 
-  const addColumn = () =>
-    t && updateTable({ headers: [...t.headers, `Col ${t.headers.length + 1}`], rows: t.rows.map(r => [...r, '']) });
+  /** Insert an empty column after column `afterIndex` (use `afterIndex === -1` to insert at the start). */
+  const insertColumnAfter = (afterIndex: number) => {
+    if (!t || t.headers.length === 0) return;
+    const w = t.headers.length;
+    const insertAt = Math.min(Math.max(afterIndex + 1, 0), w);
+    const nextName = `Col ${w + 1}`;
+    const headers = [...t.headers.slice(0, insertAt), nextName, ...t.headers.slice(insertAt)];
+    const rows = t.rows.map(r => {
+      const p = padRowToLength(r, w);
+      return [...p.slice(0, insertAt), '', ...p.slice(insertAt)];
+    });
+    updateTable({ headers, rows });
+  };
+
+  /** Append one column at the right. */
+  const addColumn = () => {
+    if (!t) return;
+    insertColumnAfter(t.headers.length - 1);
+  };
+
   const removeColumn = (ci: number) =>
     t &&
     updateTable({
       headers: t.headers.filter((_, i) => i !== ci),
-      rows: t.rows.map(r => r.filter((_, i) => i !== ci)),
+      rows: t.rows.map(r => padRowToLength(r, t.headers.length).filter((_, i) => i !== ci)),
     });
-  const addRow = () => t && updateTable({ rows: [...t.rows, Array(t.headers.length).fill('')] });
+  const addRow = () =>
+    t && updateTable({ rows: [...t.rows.map(r => padRowToLength(r, t.headers.length)), Array(t.headers.length).fill('')] });
   const removeRow = (ri: number) => t && updateTable({ rows: t.rows.filter((_, i) => i !== ri) });
 
   const buildCorrectionLogForTable = (tbl: GTTable) => {
-    const o = originalsRef.current.get(tbl.table_index);
+    const o = originalsRef.current.get(baselineKey(tbl));
     if (!o) return [];
     const log: { row: number; col: number; original: string; corrected: string }[] = [];
+    const oh0 = padRowToLength(o.headers, tbl.headers.length);
     tbl.headers.forEach((h, ci) => {
-      const oh = o.headers[ci] ?? '';
+      const oh = oh0[ci] ?? '';
       if (h !== oh) log.push({ row: -1, col: ci, original: oh, corrected: h });
     });
     tbl.rows.forEach((row, ri) => {
-      row.forEach((cell, ci) => {
-        const oc = o.rows[ri]?.[ci] ?? '';
+      const r = padRowToLength(row, tbl.headers.length);
+      const ob = padRowToLength(o.rows[ri], tbl.headers.length);
+      tbl.headers.forEach((_, ci) => {
+        const cell = r[ci] ?? '';
+        const oc = ob[ci] ?? '';
         if (cell !== oc) log.push({ row: ri, col: ci, original: oc, corrected: cell });
       });
     });
@@ -527,10 +682,43 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
             <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Ground truth</h2>
             <p className="text-sm text-slate-500 truncate max-w-md">{filename}</p>
             {!loading && (
-              <p className="text-xs text-slate-500 mt-1">
-                <span className="font-medium text-indigo-600 dark:text-indigo-400">{correctionCount}</span> cells
-                corrected
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                <label htmlFor="gt-cells-corrected" className="inline-flex items-center gap-2">
+                  <span>Cells corrected</span>
+                  <input
+                    id="gt-cells-corrected"
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    aria-describedby={manualCellsCorrected !== null ? undefined : 'gt-cells-corrected-hint'}
+                    className="w-16 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-0.5 text-sm font-medium text-indigo-600 dark:text-indigo-400 tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={displayedCellsCorrected}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (v === '') {
+                        setManualCellsCorrected(null);
+                        return;
+                      }
+                      const n = parseInt(v, 10);
+                      if (!Number.isNaN(n) && n >= 0) setManualCellsCorrected(n);
+                    }}
+                  />
+                </label>
+                {manualCellsCorrected !== null ? (
+                  <button
+                    type="button"
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                    onClick={() => setManualCellsCorrected(null)}
+                  >
+                    Use automatic ({correctionCount})
+                  </button>
+                ) : (
+                  <span id="gt-cells-corrected-hint" className="text-slate-400 dark:text-slate-500">
+                    Auto from snapshot diff — edit the number to override for this session
+                  </span>
+                )}
+              </div>
             )}
             {docLabels && !docLabelsLoading && (
               <div className="mt-3 flex flex-wrap items-end gap-3 max-w-2xl">
@@ -601,6 +789,22 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
               {showSeedBanner && (
                 <div className="mx-3 mt-3 px-3 py-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200 text-sm border border-amber-200 dark:border-amber-800">
                   Pre-extracted by an automated tool (seed). Verify every cell before confirming.
+                </div>
+              )}
+              {mergeUndoSurvivorId && (
+                <div className="mx-3 mt-2 px-3 py-2 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-violet-900 dark:text-violet-100">
+                    Last table merge can be reverted (restores the removed table and previous rows).
+                  </p>
+                  <button
+                    type="button"
+                    disabled={isMerging}
+                    onClick={() => void handleUndoMerge()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50"
+                  >
+                    {isMerging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Undo2 className="w-3.5 h-3.5" />}
+                    Undo merge
+                  </button>
                 </div>
               )}
 
@@ -716,17 +920,16 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
                       })}
                   </div>
                   {mergeTargetId && (() => {
-                    const a = tables.find(x => x.id === mergingTableId);
-                    const b = tables.find(x => x.id === mergeTargetId);
-                    if (!a || !b) return null;
-                    const primary = a.table_index <= b.table_index ? a : b;
-                    const secondary = a.table_index <= b.table_index ? b : a;
+                    const dest = tables.find(x => x.id === mergingTableId);
+                    const src = tables.find(x => x.id === mergeTargetId);
+                    if (!dest || !src) return null;
                     return (
                       <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800 space-y-2">
                         <p className="text-xs text-slate-600 dark:text-slate-300">
-                          Merge Table {secondary.table_index + 1} into Table {primary.table_index + 1}?
-                          Table {primary.table_index + 1}&apos;s headers will be used for the merged
-                          result.
+                          Merge Table {src.table_index + 1} into Table {dest.table_index + 1} (this
+                          table)? Table {dest.table_index + 1}&apos;s column headers stay exactly as
+                          they are; rows from Table {src.table_index + 1} are appended and padded or
+                          trimmed to match.
                         </p>
                         <div className="flex flex-wrap gap-2">
                           <button
@@ -800,29 +1003,48 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
                     </div>
 
                     <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-                      <table className="text-xs w-full border-collapse min-w-max">
+                      <table className="text-xs border-collapse w-max max-w-full">
                         <thead className="bg-slate-50 dark:bg-slate-800">
                           <tr>
                             <th className="w-8 px-2 py-2 border-b border-slate-200 dark:border-slate-700 text-slate-400">#</th>
                             {t.headers.map((h, ci) => (
                               <th key={ci} className="border-b border-slate-200 dark:border-slate-700 p-0 relative">
-                                <div className="flex items-center">
+                                <div className="flex items-center min-w-0 gap-0.5">
+                                  {ci === 0 && (
+                                    <button
+                                      type="button"
+                                      title="Insert column before the first column"
+                                      onClick={() => insertColumnAfter(-1)}
+                                      className="shrink-0 p-1 rounded text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </button>
+                                  )}
                                   <input
                                     value={h}
                                     onChange={e => setHeader(ci, e.target.value)}
                                     className={cn(
-                                      'flex-1 px-2 py-2 bg-transparent font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:bg-indigo-50 dark:focus:bg-indigo-900/20 min-w-[80px]',
+                                      'min-w-[72px] max-w-[220px] flex-1 px-2 py-2 bg-transparent font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:bg-indigo-50 dark:focus:bg-indigo-900/20',
                                       isCellEdited(t, -1, ci, h) && 'ring-1 ring-amber-400 dark:ring-amber-600 rounded'
                                     )}
                                   />
+                                  <button
+                                    type="button"
+                                    title="Insert column after this one"
+                                    onClick={() => insertColumnAfter(ci)}
+                                    className="shrink-0 p-1 rounded text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
                                   {isCellEdited(t, -1, ci, h) && (
-                                    <span className="absolute top-1 right-6 w-1.5 h-1.5 rounded-full bg-amber-500" title="Edited" />
+                                    <span className="absolute top-1 right-10 w-1.5 h-1.5 rounded-full bg-amber-500" title="Edited" />
                                   )}
                                   {t.headers.length > 1 && (
                                     <button
                                       type="button"
+                                      title="Remove column"
                                       onClick={() => removeColumn(ci)}
-                                      className="px-1 text-slate-300 hover:text-red-500 transition-colors"
+                                      className="shrink-0 px-1 text-slate-300 hover:text-red-500 transition-colors"
                                     >
                                       <X className="w-3 h-3" />
                                     </button>
@@ -830,43 +1052,44 @@ export default function GroundTruthEditor({ docId, filename, onClose, onSaved }:
                                 </div>
                               </th>
                             ))}
-                            <th className="border-b border-slate-200 dark:border-slate-700 w-8">
-                              <button type="button" onClick={addColumn} className="px-2 py-2 text-indigo-500 hover:text-indigo-700">
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {t.rows.map((row, ri) => (
-                            <tr key={ri} className="group border-b border-slate-100 dark:border-slate-800 last:border-0">
-                              <td className="px-2 py-1 text-center text-slate-300 text-[10px]">{ri + 1}</td>
-                              {row.map((cell, ci) => (
-                                <td key={ci} className="p-0 border-r border-slate-100 dark:border-slate-800 last:border-0 relative">
-                                  <input
-                                    value={cell}
-                                    onChange={e => setCell(ri, ci, e.target.value)}
-                                    className={cn(
-                                      'w-full px-2 py-1.5 bg-transparent text-slate-700 dark:text-slate-300 focus:outline-none focus:bg-indigo-50 dark:focus:bg-indigo-900/20 min-w-[80px]',
-                                      isCellEdited(t, ri, ci, cell) && 'ring-1 ring-amber-400 dark:ring-amber-600'
-                                    )}
-                                  />
-                                  {isCellEdited(t, ri, ci, cell) && (
-                                    <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber-500" title="Edited" />
-                                  )}
+                          {t.rows.map((row, ri) => {
+                            const cells = padRowToLength(row, t.headers.length);
+                            return (
+                              <tr key={ri} className="group border-b border-slate-100 dark:border-slate-800 last:border-0">
+                                <td className="px-2 py-1 text-center text-slate-300 text-[10px]">{ri + 1}</td>
+                                {t.headers.map((_, ci) => {
+                                  const cell = cells[ci] ?? '';
+                                  return (
+                                    <td key={ci} className="p-0 border-r border-slate-100 dark:border-slate-800 relative">
+                                      <input
+                                        value={cell}
+                                        onChange={e => setCell(ri, ci, e.target.value)}
+                                        className={cn(
+                                          'w-full min-w-[72px] max-w-[220px] px-2 py-1.5 bg-transparent text-slate-700 dark:text-slate-300 focus:outline-none focus:bg-indigo-50 dark:focus:bg-indigo-900/20',
+                                          isCellEdited(t, ri, ci, cell) && 'ring-1 ring-amber-400 dark:ring-amber-600'
+                                        )}
+                                      />
+                                      {isCellEdited(t, ri, ci, cell) && (
+                                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber-500" title="Edited" />
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                                <td className="px-1 w-8">
+                                  <button
+                                    type="button"
+                                    onClick={() => removeRow(ri)}
+                                    className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-300 hover:text-red-500 transition-all"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
                                 </td>
-                              ))}
-                              <td className="px-1">
-                                <button
-                                  type="button"
-                                  onClick={() => removeRow(ri)}
-                                  className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-300 hover:text-red-500 transition-all"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

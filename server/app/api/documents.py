@@ -1,3 +1,4 @@
+import copy
 import os
 import uuid
 import shutil
@@ -10,7 +11,7 @@ import fitz  # PyMuPDF
 from pydantic import BaseModel
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import JSONResponse, FileResponse
-from sqlalchemy import select, delete as sa_delete, and_
+from sqlalchemy import select, delete as sa_delete, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
@@ -151,6 +152,18 @@ async def _apply_default_tool_extraction_and_gt(db: AsyncSession, doc: Document)
         }
 
     n = await _insert_gt_from_extraction_results(db, doc.id, tool, results)
+    if tool == "claude_sonnet" and results:
+        await db.execute(
+            update(ExtractionResult)
+            .where(
+                and_(
+                    ExtractionResult.document_id == doc.id,
+                    ExtractionResult.tool_name == tool,
+                )
+            )
+            .values(is_draft=True)
+        )
+        await db.commit()
     out: Dict[str, Any] = {
         "seed_tool": tool,
         "tables_seeded": n,
@@ -353,6 +366,12 @@ class GroundTruthMergeIn(BaseModel):
     secondary_table_id: uuid.UUID
 
 
+class GroundTruthUndoMergeIn(BaseModel):
+    """Undo the last merge recorded on this survivor row's correction_log."""
+
+    survivor_table_id: uuid.UUID
+
+
 def _gt_row_to_width(row: List[Any], width: int) -> List[str]:
     cells = [str(c) if c is not None else "" for c in (row or [])]
     if len(cells) < width:
@@ -376,6 +395,25 @@ def _ground_truth_to_json(gt: GroundTruthTable) -> Dict[str, Any]:
     }
 
 
+def _pop_last_merge_undo(log: List[Any]) -> tuple[List[Any], Dict[str, Any] | None]:
+    """Remove and return the last merge_undo entry from correction_log (if any)."""
+    if not log:
+        return log, None
+    for i in range(len(log) - 1, -1, -1):
+        e = log[i]
+        if isinstance(e, dict) and e.get("type") == "merge_undo":
+            undo = e
+            rest = log[:i] + log[i + 1 :]
+            return rest, undo
+    return log, None
+
+
+def _correction_log_has_merge_undo(log: Any) -> bool:
+    if not isinstance(log, list):
+        return False
+    return any(isinstance(e, dict) and e.get("type") == "merge_undo" for e in log)
+
+
 @router.post("/{doc_id}/ground-truth/merge")
 async def merge_ground_truth_tables(
     doc_id: uuid.UUID,
@@ -383,8 +421,8 @@ async def merge_ground_truth_tables(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Merge two ground-truth tables: rows from the higher table_index are appended
-    to the lower (primary). Headers always come from the primary table.
+    Merge secondary into primary (IDs from the client). Rows from secondary are appended
+    after primary's rows; headers always stay exactly those of the primary (merge target) table.
     """
     if body.primary_table_id == body.secondary_table_id:
         raise HTTPException(400, "primary_table_id and secondary_table_id must differ")
@@ -409,15 +447,10 @@ async def merge_ground_truth_tables(
             )
         )
     )
-    t_a = r1.scalar_one_or_none()
-    t_b = r2.scalar_one_or_none()
-    if not t_a or not t_b:
+    primary = r1.scalar_one_or_none()
+    secondary = r2.scalar_one_or_none()
+    if not primary or not secondary:
         raise HTTPException(404, "One or both ground-truth tables not found for this document")
-
-    if t_a.table_index <= t_b.table_index:
-        primary, secondary = t_a, t_b
-    else:
-        primary, secondary = t_b, t_a
 
     headers = list(primary.headers or [])
     width = len(headers)
@@ -432,18 +465,32 @@ async def merge_ground_truth_tables(
 
     log = list(getattr(primary, "correction_log", None) or [])
     ts = datetime.now(timezone.utc).isoformat()
+    removed_table_index = int(secondary.table_index)
     log.append(
         {
+            "type": "merge_undo",
             "field": "rows",
             "old_value": f"{old_row_count} rows",
             "new_value": (
-                f"merged with table_index={secondary.table_index} "
-                f"({len(sec_rows)} rows added); headers used from primary"
+                f"merged table_index={removed_table_index} into primary id={primary.id} "
+                f"({len(sec_rows)} rows added); headers unchanged on merge target"
             ),
             "corrected_at": ts,
+            "primary_rows_before": copy.deepcopy(primary.rows or []),
+            "removed_table_index": removed_table_index,
+            "removed_table": {
+                "headers": copy.deepcopy(secondary.headers or []),
+                "rows": copy.deepcopy(secondary.rows or []),
+                "notes": secondary.notes,
+                "source": getattr(secondary, "source", "manual") or "manual",
+                "confirmed": bool(getattr(secondary, "confirmed", False)),
+                "correction_log": copy.deepcopy(getattr(secondary, "correction_log", None) or []),
+                "correction_count": int(getattr(secondary, "correction_count", 0) or 0),
+            },
         }
     )
 
+    primary.headers = headers
     primary.rows = merged_rows
     primary.correction_log = log
     primary.correction_count = int(getattr(primary, "correction_count", 0) or 0) + 1
@@ -467,6 +514,80 @@ async def merge_ground_truth_tables(
     await db.refresh(primary)
 
     return _ground_truth_to_json(primary)
+
+
+@router.post("/{doc_id}/ground-truth/merge/undo")
+async def undo_merge_ground_truth_tables(
+    doc_id: uuid.UUID,
+    body: GroundTruthUndoMergeIn,
+    db: AsyncSession = Depends(get_db),
+):
+    """Restore the last merge for the given survivor table (LIFO per survivor)."""
+    doc_row = await db.execute(select(Document).where(Document.id == doc_id))
+    if not doc_row.scalar_one_or_none():
+        raise HTTPException(404, "Document not found")
+
+    pr = await db.execute(
+        select(GroundTruthTable).where(
+            and_(
+                GroundTruthTable.id == body.survivor_table_id,
+                GroundTruthTable.document_id == doc_id,
+            )
+        )
+    )
+    primary = pr.scalar_one_or_none()
+    if not primary:
+        raise HTTPException(404, "Survivor ground-truth table not found")
+
+    log = list(getattr(primary, "correction_log", None) or [])
+    new_log, undo = _pop_last_merge_undo(log)
+    if not undo or not isinstance(undo.get("removed_table"), dict):
+        raise HTTPException(404, "No merge to undo for this table")
+
+    removed = undo["removed_table"]
+    s_idx = int(undo.get("removed_table_index", 0))
+    primary_rows_before = undo.get("primary_rows_before")
+    if not isinstance(primary_rows_before, list):
+        raise HTTPException(500, "Invalid undo payload")
+
+    primary.rows = copy.deepcopy(primary_rows_before)
+    primary.correction_log = new_log
+    primary.correction_count = max(0, int(getattr(primary, "correction_count", 0) or 0) - 1)
+
+    rest = await db.execute(
+        select(GroundTruthTable)
+        .where(GroundTruthTable.document_id == doc_id)
+        .order_by(GroundTruthTable.table_index)
+    )
+    ordered = list(rest.scalars().all())
+    insert_at = max(0, min(s_idx, len(ordered)))
+
+    new_gt = GroundTruthTable(
+        document_id=doc_id,
+        table_index=insert_at,
+        headers=removed.get("headers") or [],
+        rows=removed.get("rows") or [],
+        notes=removed.get("notes"),
+        source=str(removed.get("source") or "manual"),
+        confirmed=bool(removed.get("confirmed", False)),
+        correction_log=list(removed.get("correction_log") or []),
+        correction_count=int(removed.get("correction_count", 0) or 0),
+    )
+    ordered.insert(insert_at, new_gt)
+    for i, gt in enumerate(ordered):
+        gt.table_index = i
+
+    db.add(new_gt)
+    await db.commit()
+    await db.refresh(primary)
+    await db.refresh(new_gt)
+
+    return {
+        "success": True,
+        "survivor_table_id": str(primary.id),
+        "restored_table_id": str(new_gt.id),
+        "can_undo_more": _correction_log_has_merge_undo(primary.correction_log),
+    }
 
 
 def _claude_transient_from_payload(error_text: str) -> bool:

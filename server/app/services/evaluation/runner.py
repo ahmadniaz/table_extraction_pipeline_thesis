@@ -145,6 +145,7 @@ def _normalise_tables(raw: Any) -> List[Dict[str, Any]]:
                 "col_count",
                 "textract_confidence",
                 "cell_matching_used",
+                "backend_used",
                 "metadata",
                 "extractor",
             ):
@@ -248,14 +249,16 @@ class EvaluationRunner:
             file_path,
         )
 
-    async def _extract_docling(self, file_path: str) -> Dict[str, Any]:
+    async def _extract_docling(
+        self, file_path: str, is_digital: bool = True
+    ) -> Dict[str, Any]:
         """Table extraction using Docling v2 official API with TableFormerMode.ACCURATE."""
         service = self._get_docling()
         # Docling's converter is synchronous (C++ backend via Python bindings).
         # Run in thread executor to avoid blocking the FastAPI event loop.
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            None, service.extract_tables, file_path
+            None, service.extract_tables, file_path, is_digital
         )
 
     async def _extract_google_docai(self, file_path: str) -> Dict[str, Any]:
@@ -314,9 +317,15 @@ class EvaluationRunner:
                 failure_reason="api_error",
                 is_transient_failure=False,
                 raw_output=None,
+                is_draft=False,
             )
             await self._persist_and_commit(db, er)
             return [er]
+
+        doc_result = await db.execute(select(Document).where(Document.id == document_id))
+        doc = doc_result.scalar_one_or_none()
+        page_count = doc.page_count or 1 if doc else 1
+        is_digital = bool(doc.is_digital) if doc and doc.is_digital is not None else True
 
         start = time.perf_counter()
         error_msg: Optional[str] = None
@@ -327,7 +336,10 @@ class EvaluationRunner:
         raw_safe: Any = None
 
         try:
-            raw = await getattr(self, method_name)(file_path)
+            if tool_name == "docling":
+                raw = await self._extract_docling(file_path, is_digital=is_digital)
+            else:
+                raw = await getattr(self, method_name)(file_path)
             raw_safe = _json_safe(raw)
             if isinstance(raw, dict) and raw.get("success") is False:
                 error_msg = raw.get("error", "extraction returned success=False")
@@ -354,11 +366,6 @@ class EvaluationRunner:
 
         elapsed_ms = int((time.perf_counter() - start) * 1000)
 
-        doc_result = await db.execute(select(Document).where(Document.id == document_id))
-        doc = doc_result.scalar_one_or_none()
-        page_count = doc.page_count or 1 if doc else 1
-        is_digital = bool(doc.is_digital) if doc and doc.is_digital is not None else True
-
         # Use real token counts from LLM services when available (gpt5, claude, mistral)
         usage = raw.get("usage", {}) if isinstance(raw, dict) else {}
         input_tokens = usage.get("input_tokens") if usage else None
@@ -380,6 +387,7 @@ class EvaluationRunner:
                 failure_reason=failure_reason,
                 is_transient_failure=is_transient,
                 raw_output=raw_safe,
+                is_draft=False,
             )
             await self._persist_and_commit(db, er)
             results.append(er)
@@ -404,6 +412,7 @@ class EvaluationRunner:
                 failure_reason=fr,
                 is_transient_failure=transient,
                 raw_output=raw_safe,
+                is_draft=False,
             )
             await self._persist_and_commit(db, er)
             results.append(er)
@@ -422,6 +431,7 @@ class EvaluationRunner:
                 failure_reason=None,
                 is_transient_failure=False,
                 raw_output=raw_safe if idx == 0 else None,
+                is_draft=False,
             )
             await self._persist_and_commit(db, er)
             results.append(er)

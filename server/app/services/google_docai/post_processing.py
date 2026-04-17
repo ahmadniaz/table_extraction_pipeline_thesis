@@ -62,17 +62,12 @@ class TextCleaner:
         # Remove excessive underscores (common in form fields and OCR artifacts)
         cleaned = re.sub(r'_+', ' ', text)
         
-        # Remove excessive dashes (common in form fields)
-        cleaned = re.sub(r'-+', ' ', cleaned)
-        
         # Remove excessive dots/periods
         cleaned = re.sub(r'\.+', '.', cleaned)
         
-        # Remove excessive spaces
-        cleaned = re.sub(r'\s+', ' ', cleaned)
-        
-        # Remove common OCR artifacts
-        cleaned = cleaned.replace("|", "I")  # Common OCR mistake
+        # Collapse horizontal whitespace only; preserve newlines within multi-line cells
+        cleaned = re.sub(r'[ \t]+', ' ', cleaned)
+        cleaned = re.sub(r'\n{2,}', '\n', cleaned)
         
         # Fix OCR errors - O to 0 in numeric contexts (CRITICAL FIX)
         cleaned = TextCleaner.fix_ocr_errors(cleaned)

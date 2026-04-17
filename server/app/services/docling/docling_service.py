@@ -51,6 +51,7 @@ class DoclingService:
     def __init__(self):
         self._converter_cell_match: Optional[Any] = None
         self._converter_no_cell_match: Optional[Any] = None
+        self._converter_pdfium: Optional[Any] = None
         self._initialised = False
 
     def _ensure_initialised(self) -> None:
@@ -58,6 +59,7 @@ class DoclingService:
         if self._initialised:
             return
 
+        from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
         from docling.document_converter import DocumentConverter, PdfFormatOption
         from docling.datamodel.base_models import InputFormat
         from docling.datamodel.pipeline_options import (
@@ -83,6 +85,21 @@ class DoclingService:
         self._converter_cell_match = DocumentConverter(
             format_options={
                 InputFormat.PDF: PdfFormatOption(pipeline_options=opts_a)
+            }
+        )
+
+        # ── Converter A2: same pipeline as A but PyPdfium backend (page-dimensions fix) ──
+        opts_pdfium = PdfPipelineOptions(do_table_structure=True, do_ocr=True)
+        opts_pdfium.table_structure_options.mode = TableFormerMode.ACCURATE
+        opts_pdfium.table_structure_options.do_cell_matching = True
+        opts_pdfium.ocr_options = ocr_options
+
+        self._converter_pdfium = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(
+                    pipeline_options=opts_pdfium,
+                    backend=PyPdfiumDocumentBackend,
+                )
             }
         )
 
@@ -124,12 +141,14 @@ class DoclingService:
                         "row_count": int,
                         "col_count": int,
                         "cell_matching_used": bool,
+                        "backend_used": str,
                     },
                     ...
                 ],
                 "total_pages": int,
                 "tool": "docling",
                 "model": "TableFormerMode.ACCURATE",
+                "backend_used": str,
             }
 
         Raises:
@@ -144,18 +163,40 @@ class DoclingService:
 
         # ── Primary conversion: cell matching ON ──
         logger.info("Docling: converting %s (is_digital=%s)", path.name, is_digital)
+        backend_used = "docling_parse_v4"
         try:
             conv_res = self._converter_cell_match.convert(str(path))
+        except RuntimeError as exc:
+            msg = str(exc).lower()
+            if "page-dimensions" in msg or "page-dimension" in msg:
+                logger.warning(
+                    "Docling: docling_parse_v4 failed with page-dimensions error on %s — "
+                    "retrying with PyPdfiumDocumentBackend",
+                    path.name,
+                )
+                try:
+                    conv_res = self._converter_pdfium.convert(str(path))
+                    backend_used = "pypdfium2"
+                except Exception as exc2:
+                    raise RuntimeError(
+                        f"Docling conversion failed for {file_path} "
+                        f"(both backends attempted): {exc2}"
+                    ) from exc2
+            else:
+                raise RuntimeError(
+                    f"Docling conversion failed for {file_path}: {exc}"
+                ) from exc
         except Exception as exc:
             raise RuntimeError(
                 f"Docling conversion failed for {file_path}: {exc}"
             ) from exc
 
         tables_primary = self._extract_tables_from_result(
-            conv_res, cell_matching_used=True
+            conv_res, cell_matching_used=True, backend_used=backend_used
         )
 
         conv_for_meta: Any = conv_res
+        backend_used_out = backend_used
 
         # ── Detect column-merge issue ──
         # If any table has inconsistent column counts across rows,
@@ -170,13 +211,18 @@ class DoclingService:
             )
             try:
                 conv_res_b = self._converter_no_cell_match.convert(str(path))
+                # No custom backend: default parse backend (docling_parse_v4).
+                backend_fallback = "docling_parse_v4"
                 tables_fallback = self._extract_tables_from_result(
-                    conv_res_b, cell_matching_used=False
+                    conv_res_b,
+                    cell_matching_used=False,
+                    backend_used=backend_fallback,
                 )
                 # Use fallback only if it produces more consistent results
                 if len(tables_fallback) >= len(tables_primary):
                     tables_primary = tables_fallback
                     conv_for_meta = conv_res_b
+                    backend_used_out = backend_fallback
                     logger.info(
                         "Docling: using fallback (no cell matching) result "
                         "— %d tables",
@@ -215,10 +261,14 @@ class DoclingService:
             "total_pages": total_pages,
             "tool": "docling",
             "model": "TableFormerMode.ACCURATE",
+            "backend_used": backend_used_out,
         }
 
     def _extract_tables_from_result(
-        self, conv_res: Any, cell_matching_used: bool
+        self,
+        conv_res: Any,
+        cell_matching_used: bool,
+        backend_used: str,
     ) -> List[Dict[str, Any]]:
         """
         Extract table data from a Docling ConversionResult using the
@@ -288,6 +338,7 @@ class DoclingService:
                         "row_count": len(rows),
                         "col_count": len(headers),
                         "cell_matching_used": cell_matching_used,
+                        "backend_used": backend_used,
                     }
                 )
 

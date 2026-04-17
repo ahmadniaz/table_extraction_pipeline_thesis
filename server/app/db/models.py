@@ -49,6 +49,8 @@ class ExtractionResult(Base):
     failure_reason = Column(String, nullable=True)
     is_transient_failure = Column(Boolean, nullable=False, default=False, server_default=text('false'))
     raw_output = Column(JSON, nullable=True)
+    # True until the user saves from the extraction editor (upload seed for Claude, or after POST /api/extract).
+    is_draft = Column(Boolean, nullable=False, default=False, server_default=text('false'))
 
 
 class EvaluationScore(Base):

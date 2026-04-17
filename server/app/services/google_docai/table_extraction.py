@@ -187,7 +187,7 @@ class TableExtractor:
                     if start_idx < len(document.text) and end_idx <= len(document.text):
                         text_parts.append(document.text[start_idx:end_idx])
             
-            return " ".join(text_parts).strip()
+            return "".join(text_parts).strip()
         except Exception as exc:
             logger.debug("DocAI: error extracting text from text anchor: %s", exc)
             return ""

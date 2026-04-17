@@ -6,6 +6,9 @@ client/.env
 # Server ignores
 server/venv/
 server/.env
+
+# Confidential / local corpus PDFs (do not commit)
+server/data/
 server/**/.env
 server/__pycache__/
 server/**/__pycache__/

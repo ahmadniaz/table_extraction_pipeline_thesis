@@ -29,11 +29,23 @@ def multi_page_pdf(tmp_path):
     return p
 
 
-def test_multipage_requires_s3_bucket(multi_page_pdf, monkeypatch):
+def test_multipage_without_s3_uses_sync_per_page(multi_page_pdf, monkeypatch):
     monkeypatch.delenv("AWS_S3_BUCKET", raising=False)
+    mock_client = MagicMock()
+    mock_client.analyze_document.return_value = {"Blocks": []}
+
+    def fake_get_client(self):
+        return mock_client
+
+    monkeypatch.setattr(TextractService, "_get_client", fake_get_client)
     svc = TextractService()
-    with pytest.raises(ValueError, match="AWS_S3_BUCKET"):
-        svc.analyze_document_tables(str(multi_page_pdf))
+    out = svc.analyze_document_tables(str(multi_page_pdf))
+
+    assert mock_client.analyze_document.call_count == 3
+    mock_client.start_document_analysis.assert_not_called()
+    assert out["tool"] == "aws_textract"
+    assert out["tables"] == []
+    assert out["pages_analyzed"] == 3
 
 
 def test_single_page_uses_sync_analyze_document(single_page_pdf, monkeypatch):

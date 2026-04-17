@@ -19,7 +19,10 @@ Pricing (us-east-1 / us-west-2, April 2026):
 
 Environment:
   - AWS_REGION — Textract and S3 client region (bucket should match).
-  - AWS_S3_BUCKET — required for multi-page PDFs (upload → analyze → delete).
+  - AWS_S3_BUCKET — recommended for multi-page PDFs: async StartDocumentAnalysis
+    (one job, S3 upload → poll → delete). If unset, multi-page PDFs fall back to
+    one synchronous AnalyzeDocument call per page (same AWS per-page TABLE pricing,
+    more round-trips; fine for dev/small docs).
   - Standard boto3 credential chain for both Textract and S3.
 
 Design notes:
@@ -99,7 +102,6 @@ class TextractService:
 
         Raises:
             FileNotFoundError: if file_path does not exist.
-            ValueError: if multi-page and AWS_S3_BUCKET is not set.
             RuntimeError: if async Textract job fails or times out.
             botocore.exceptions.ClientError / BotoCoreError: propagate to runner.
         """
@@ -117,7 +119,16 @@ class TextractService:
 
         if page_count == 1:
             return self._analyze_sync(path)
-        return self._analyze_async_s3(path, page_count)
+        s3_bucket = os.environ.get("AWS_S3_BUCKET", "").strip()
+        if s3_bucket:
+            return self._analyze_async_s3(path, page_count)
+        logger.warning(
+            "TextractService: AWS_S3_BUCKET not set — using synchronous AnalyzeDocument "
+            "per page for %d-page %s (async S3 path is preferred for production).",
+            page_count,
+            path.name,
+        )
+        return self._analyze_multipage_sync_per_page(path, page_count)
 
     def _analyze_sync(self, path: Path) -> Dict[str, Any]:
         client = self._get_client()
@@ -133,13 +144,59 @@ class TextractService:
         blocks = response.get("Blocks", [])
         return self._parse_blocks(blocks, path.name)
 
+    def _analyze_multipage_sync_per_page(self, path: Path, page_count: int) -> Dict[str, Any]:
+        """
+        Multi-page PDF without S3: AWS only allows Bytes on sync AnalyzeDocument for
+        a single page. Split with PyMuPDF and run one sync call per page, then merge.
+        """
+        import fitz
+
+        client = self._get_client()
+        all_tables: List[Dict[str, Any]] = []
+        doc = fitz.open(str(path))
+        try:
+            for i in range(page_count):
+                single = fitz.open()
+                try:
+                    single.insert_pdf(doc, from_page=i, to_page=i)
+                    pdf_bytes = single.tobytes()
+                finally:
+                    single.close()
+                logger.info(
+                    "TextractService: sync AnalyzeDocument page %d/%d of %s",
+                    i + 1,
+                    page_count,
+                    path.name,
+                )
+                response = client.analyze_document(
+                    Document={"Bytes": pdf_bytes},
+                    FeatureTypes=["TABLES"],
+                )
+                blocks = response.get("Blocks", [])
+                parsed = self._parse_blocks(blocks, f"{path.name}#p{i + 1}")
+                for t in parsed.get("tables", []):
+                    t["page_number"] = i
+                    t["table_index"] = len(all_tables)
+                    all_tables.append(t)
+        finally:
+            doc.close()
+
+        logger.info(
+            "TextractService: %d tables from %d-page sync-per-page run on %s",
+            len(all_tables),
+            page_count,
+            path.name,
+        )
+        return {
+            "tables": all_tables,
+            "pages_analyzed": page_count,
+            "tool": "aws_textract",
+        }
+
     def _analyze_async_s3(self, path: Path, page_count: int) -> Dict[str, Any]:
         s3_bucket = os.environ.get("AWS_S3_BUCKET", "").strip()
         if not s3_bucket:
-            raise ValueError(
-                "AWS_S3_BUCKET environment variable is required for multi-page PDFs "
-                "(Textract synchronous Bytes API supports single-page documents only)."
-            )
+            raise ValueError("AWS_S3_BUCKET is required for _analyze_async_s3")
 
         s3_key = f"textract-jobs/{uuid.uuid4().hex}/{path.name}"
         s3 = self._get_s3_client()

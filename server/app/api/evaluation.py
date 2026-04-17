@@ -7,7 +7,7 @@ from typing import List, Optional, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
-from sqlalchemy import select, and_, delete
+from sqlalchemy import select, and_, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
@@ -25,6 +25,23 @@ _SCORE_ZERO_NOTE = "Scored as 0 — tool produced no output"
 # Extraction outcomes we treat as idempotent: re-calling POST /api/extract returns already_exists.
 # Any other failure_reason (e.g. api_error) must allow delete + re-run so Retry works.
 _FAILURE_REASONS_IDEMPOTENT_OK = frozenset({"tool_limitation", "empty_output"})
+
+
+async def _mark_extractions_draft(
+    db: AsyncSession, doc_id: uuid.UUID, tool_name: str
+) -> None:
+    """Mark all extraction rows for this tool as draft until the user saves from the editor."""
+    await db.execute(
+        update(ExtractionResult)
+        .where(
+            and_(
+                ExtractionResult.document_id == doc_id,
+                ExtractionResult.tool_name == tool_name,
+            )
+        )
+        .values(is_draft=True)
+    )
+    await db.commit()
 
 
 def _should_replace_existing_extraction(existing: List[ExtractionResult]) -> bool:
@@ -94,6 +111,10 @@ def _resolve_tools(tools: List[str]) -> List[str]:
 async def extract_single_tool(
     doc_id: uuid.UUID,
     tool_name: str,
+    force: bool = Query(
+        False,
+        description="Delete existing extraction rows and run again (evaluation UI Re-run / Retry).",
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Run a single extraction tool on one document (idempotent unless prior run was transient)."""
@@ -121,7 +142,7 @@ async def extract_single_tool(
     existing = list(existing_res.scalars().all())
 
     if existing:
-        if not _should_replace_existing_extraction(existing):
+        if not force and not _should_replace_existing_extraction(existing):
             out = _summarise_extraction_rows(existing)
             out["already_exists"] = True
             out["extraction_executed"] = False
@@ -140,6 +161,7 @@ async def extract_single_tool(
 
     runner = EvaluationRunner()
     rows = await runner.run_tool(tool_name, doc.file_path, doc.id, db)
+    await _mark_extractions_draft(db, doc_id, tool_name)
     out = _summarise_extraction_rows(rows)
     out["already_exists"] = False
     out["extraction_executed"] = True
@@ -189,6 +211,15 @@ async def evaluate_tool_for_document(
                     ),
                 },
             )
+
+    if any(bool(getattr(er, "is_draft", False)) for er in extractions):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": "draft_extraction",
+                "message": "Open the extraction editor, review tables, and click Save extraction before scoring.",
+            },
+        )
 
     gt_res = await db.execute(
         select(GroundTruthTable)
@@ -485,6 +516,7 @@ async def get_extractions_for_tool(
             "error_message": er.error_message,
             "failure_reason": er.failure_reason,
             "is_transient_failure": bool(er.is_transient_failure),
+            "is_draft": bool(getattr(er, "is_draft", False)),
         }
         for er in ers
     ]
@@ -562,6 +594,7 @@ async def put_extractions_for_tool(
             error_message=None,
             failure_reason=None,
             is_transient_failure=False,
+            is_draft=False,
         )
         db.add(er)
 
@@ -586,6 +619,7 @@ async def put_extractions_for_tool(
             "extracted_rows": er.extracted_rows,
             "processing_time_ms": er.processing_time_ms,
             "cost_usd": float(er.cost_usd) if er.cost_usd else None,
+            "is_draft": bool(getattr(er, "is_draft", False)),
         }
         for er in saved
     ]

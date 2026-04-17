@@ -30,9 +30,9 @@ interface Props {
 
 function ReadonlyTable({ title, headers, rows }: { title: string; headers: string[]; rows: string[][] }) {
   return (
-    <div className="flex flex-col min-h-0 h-full">
-      <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2 shrink-0">{title}</h3>
-      <div className="flex-1 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <h3 className="mb-2 shrink-0 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h3>
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
         <table className="text-xs w-full border-collapse min-w-max">
           <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800 z-10">
             <tr>
@@ -152,8 +152,8 @@ export default function ExtractionPreviewModal({ docId, filename, toolName, tool
         ) : err ? (
           <p className="p-8 text-center text-red-600">{err}</p>
         ) : (
-          <div className="flex-1 flex flex-col md:flex-row min-h-0 gap-0">
-            <div className="flex-1 min-h-[200px] md:min-h-0 p-4 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700 flex flex-col">
+          <div className="flex min-h-0 flex-1 flex-col gap-0 md:flex-row">
+            <div className="flex min-h-[200px] flex-1 flex-col overflow-hidden border-b border-slate-200 p-4 dark:border-slate-700 md:min-h-0 md:border-b-0 md:border-r">
               {ext.length > 1 && (
                 <div className="flex gap-1 mb-2 flex-wrap shrink-0">
                   {ext.map((e, i) => (
@@ -173,7 +173,7 @@ export default function ExtractionPreviewModal({ docId, filename, toolName, tool
               )}
               <ReadonlyTable title={`${toolLabel} Output`} headers={extHeaders} rows={extRows} />
             </div>
-            <div className="flex-1 min-h-[200px] md:min-h-0 p-4 flex flex-col">
+            <div className="flex min-h-[200px] flex-1 flex-col overflow-hidden p-4 md:min-h-0">
               {gt.length > 1 && (
                 <div className="flex gap-1 mb-2 flex-wrap shrink-0">
                   {gt.map((g, i) => (

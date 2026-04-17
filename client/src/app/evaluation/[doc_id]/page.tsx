@@ -46,6 +46,8 @@ interface Er {
   is_transient_failure: boolean;
   processing_time_ms: number | null;
   cost_usd: number | null;
+  /** Server: true until Save extraction in the editor (upload Claude seed or after Extract). */
+  is_draft?: boolean;
 }
 
 interface DocInfo {
@@ -90,6 +92,10 @@ function isAbortError(e: unknown): boolean {
   return isAxiosError(e) && e.code === 'ERR_CANCELED';
 }
 
+function extractionsNeedEditorSave(ers: Er[]): boolean {
+  return ers.some(e => e.is_draft === true);
+}
+
 export default function DocumentEvaluationPage() {
   const params = useParams();
   const docId = (params?.doc_id as string) ?? '';
@@ -128,8 +134,13 @@ export default function DocumentEvaluationPage() {
   const refreshTool = useCallback(
     async (tool: string) => {
       const { data } = await sharedGetExtractionsForTool<Er[]>(docId, tool);
-      const kind = classifyExtraction(data || [], doc?.is_digital ?? null);
-      setRows(prev => ({ ...prev, [tool]: { kind, ers: data || [] } }));
+      const ers = data || [];
+      const kind = classifyExtraction(ers, doc?.is_digital ?? null);
+      setRows(prev => ({ ...prev, [tool]: { kind, ers } }));
+      setPendingExtractionReview(prev => ({
+        ...prev,
+        [tool]: extractionsNeedEditorSave(ers),
+      }));
     },
     [docId, doc?.is_digital]
   );
@@ -232,10 +243,16 @@ export default function DocumentEvaluationPage() {
           setEvalBlock({});
         }
         setRows(merged);
+        const pendingInit: Record<string, boolean> = {};
+        for (const { id } of ALL_EVAL_TOOLS) {
+          pendingInit[id] = extractionsNeedEditorSave(merged[id]?.ers ?? []);
+        }
+        setPendingExtractionReview(pendingInit);
       } catch (e) {
         if (isAbortError(e)) return;
         setDoc(null);
         setRows({});
+        setPendingExtractionReview({});
       } finally {
         if (!signal?.aborted) {
           setLoading(false);
@@ -257,7 +274,7 @@ export default function DocumentEvaluationPage() {
     setExtractionEditorOpen(true);
   };
 
-  const runExtract = async (tool: string) => {
+  const runExtract = async (tool: string, opts?: { force?: boolean }) => {
     if (!doc || !docId || extractBusy) return;
     setExtractBusy(true);
     setRows(prev => ({
@@ -271,19 +288,20 @@ export default function DocumentEvaluationPage() {
         already_exists?: boolean;
         /** True when the server actually invoked the extractor (Extract, Re-run, Retry). */
         extraction_executed?: boolean;
-      }>(`${API}/api/extract/${docId}/${tool}`);
+      }>(`${API}/api/extract/${docId}/${tool}`, null, {
+        params: opts?.force ? { force: true } : undefined,
+      });
       if (data.failure_reason === 'rate_limit' || data.is_transient_failure) {
         setRetryAfter(prev => ({ ...prev, [tool]: Date.now() + 60_000 }));
       }
       const openedNewRun =
         data.extraction_executed === true ||
         (data.extraction_executed == null && data.already_exists === false);
+      await refreshTool(tool);
       if (openedNewRun) {
-        setPendingExtractionReview(prev => ({ ...prev, [tool]: true }));
         setExtractionEditorTool(tool);
         setExtractionEditorOpen(true);
       }
-      await refreshTool(tool);
     } catch (e: unknown) {
       const ax = e as { response?: { status?: number } };
       if (ax.response?.status === 429) {
@@ -322,9 +340,15 @@ export default function DocumentEvaluationPage() {
       }));
       toast.success(`Evaluated ${tool}`);
     } catch (e: unknown) {
-      const ax = e as { response?: { status?: number } };
+      const ax = e as { response?: { status?: number; data?: unknown } };
       if (ax.response?.status === 422) {
-        setGtModal(true);
+        const body = ax.response?.data as { error?: string; message?: string } | undefined;
+        if (body?.error === 'draft_extraction') {
+          toast.error(body?.message ?? 'Save extraction in the editor before scoring');
+        } else {
+          setGtModal(true);
+        }
+        await refreshTool(tool);
       } else if (ax.response?.status === 503) {
         toast.error('Transient extraction failure — fix extraction before scoring');
         await refreshTool(tool);
@@ -352,6 +376,7 @@ export default function DocumentEvaluationPage() {
         continue;
       }
       if (!r.ers.length) continue;
+      const kindBeforeEval = r.kind;
       setRows(prev => ({
         ...prev,
         [id]: { ...prev[id], kind: 'evaluating', ers: prev[id]?.ers || [] },
@@ -363,11 +388,21 @@ export default function DocumentEvaluationPage() {
           [id]: { ...prev[id], kind: 'evaluated', ers: prev[id]?.ers || [] },
         }));
       } catch (e: unknown) {
-        const ax = e as { response?: { status?: number } };
+        const ax = e as { response?: { status?: number; data?: unknown } };
         if (ax.response?.status === 422) {
-          setGtModal(true);
-          stopped = true;
-          break;
+          const body = ax.response?.data as { error?: string; message?: string } | undefined;
+          if (body?.error === 'draft_extraction') {
+            toast.error(body?.message ?? 'Save extraction in the editor before scoring');
+            setRows(prev => ({
+              ...prev,
+              [id]: { ...prev[id], kind: kindBeforeEval, ers: prev[id]?.ers || [] },
+            }));
+            continue;
+          } else {
+            setGtModal(true);
+            stopped = true;
+            break;
+          }
         }
         if (ax.response?.status === 503) {
           setRows(prev => ({
@@ -545,7 +580,7 @@ export default function DocumentEvaluationPage() {
           )}
         </div>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Claude extraction runs on upload. Run other tools, confirm ground truth in Corpus, then score against confirmed tables.
+          Claude runs on upload as a draft extraction: open Draft on the evaluation page, adjust tables if needed, and save before scoring. Run other tools, confirm ground truth in Corpus, then score against confirmed tables.
         </p>
         {!documentReady && (
           <p className="text-sm text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2">
@@ -606,6 +641,7 @@ export default function DocumentEvaluationPage() {
                 k !== 'pending' &&
                 k !== 'extracting' &&
                 k !== 'evaluating';
+              const needsEditorSave = Boolean(pendingExtractionReview[id]);
 
               return (
                 <tr key={id} className="border-t border-slate-100 dark:border-slate-800">
@@ -628,10 +664,14 @@ export default function DocumentEvaluationPage() {
                             type="button"
                             disabled={!documentReady || extractBusy}
                             onClick={() => openExtractionEditor(id)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            className={
+                              needsEditorSave
+                                ? 'inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+                                : 'inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'
+                            }
                           >
                             <Pencil className="w-3 h-3" />
-                            Edit
+                            {needsEditorSave ? 'Draft' : 'Edit'}
                           </button>
                         )}
                         {!canEditExtraction && <span className="text-xs text-slate-400">—</span>}
@@ -656,10 +696,14 @@ export default function DocumentEvaluationPage() {
                                 type="button"
                                 disabled={!documentReady || extractBusy}
                                 onClick={() => openExtractionEditor(id)}
-                                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                                className={
+                                  needsEditorSave
+                                    ? 'inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+                                    : 'inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40'
+                                }
                               >
                                 <Pencil className="w-3 h-3" />
-                                Edit
+                                {needsEditorSave ? 'Draft' : 'Edit'}
                               </button>
                             )}
                             {canPreview && (
@@ -676,7 +720,7 @@ export default function DocumentEvaluationPage() {
                             <button
                               type="button"
                               disabled={!documentReady || extractBusy}
-                              onClick={() => runExtract(id)}
+                              onClick={() => runExtract(id, { force: true })}
                               className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-50"
                             >
                               <RefreshCw className="w-3 h-3" />
@@ -691,16 +735,20 @@ export default function DocumentEvaluationPage() {
                                 type="button"
                                 disabled={!documentReady || extractBusy}
                                 onClick={() => openExtractionEditor(id)}
-                                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-50"
+                                className={
+                                  needsEditorSave
+                                    ? 'inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+                                    : 'inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-50'
+                                }
                               >
                                 <Pencil className="w-3 h-3" />
-                                Edit
+                                {needsEditorSave ? 'Draft' : 'Edit'}
                               </button>
                             )}
                             <button
                               type="button"
                               disabled={!documentReady || extractBusy || retryWait > 0}
-                              onClick={() => runExtract(id)}
+                              onClick={() => runExtract(id, { force: true })}
                               className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-40"
                             >
                               <RefreshCw className="w-3 h-3" />
@@ -770,7 +818,7 @@ export default function DocumentEvaluationPage() {
           </button>
           {!allExtractionsComplete && (
             <p className="text-xs text-slate-500 text-right max-w-xs">
-              Run Extract on each tool above (Claude is already done from upload).
+              Run Extract on each tool above (Claude is seeded from upload — open Draft and save when ready).
             </p>
           )}
           {allExtractionsComplete && anyPendingReview && (
@@ -803,10 +851,7 @@ export default function DocumentEvaluationPage() {
           }}
           onSaved={() => {
             const t = extractionEditorTool;
-            if (t) {
-              setPendingExtractionReview(p => ({ ...p, [t]: false }));
-              void refreshTool(t);
-            }
+            if (t) void refreshTool(t);
             void refreshResults();
           }}
         />

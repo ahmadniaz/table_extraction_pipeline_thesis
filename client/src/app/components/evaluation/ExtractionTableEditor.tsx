@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { Plus, Trash2, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { useCallback, useMemo, useReducer, useRef, useState } from 'react';
+import { Plus, Trash2, X, ChevronUp, ChevronDown, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type EditableExtractionTable = {
@@ -67,6 +67,14 @@ export default function ExtractionTableEditor({
   const [activeIdx, setActiveIdx] = useState(0);
   const [mergingKey, setMergingKey] = useState<string | null>(null);
   const [mergeTargetKey, setMergeTargetKey] = useState<string | null>(null);
+  const mergeUndoStackRef = useRef<EditableExtractionTable[][]>([]);
+  const [, bumpMergeUndoUi] = useReducer((n: number) => n + 1, 0);
+
+  const clearMergeUndoStack = useCallback(() => {
+    if (mergeUndoStackRef.current.length === 0) return;
+    mergeUndoStackRef.current = [];
+    bumpMergeUndoUi();
+  }, []);
 
   const t = tables[activeIdx];
 
@@ -129,6 +137,7 @@ export default function ExtractionTableEditor({
   };
 
   const deleteTableAt = (arrayIndex: number) => {
+    clearMergeUndoStack();
     if (tables.length === 1) {
       resetTables([emptyExtractionTable(0)], 0);
       setMergingKey(null);
@@ -145,12 +154,14 @@ export default function ExtractionTableEditor({
   };
 
   const addTable = () => {
+    clearMergeUndoStack();
     resetTables([...tables, emptyExtractionTable(tables.length)], tables.length);
   };
 
   const moveTable = (from: number, dir: -1 | 1) => {
     const to = from + dir;
     if (to < 0 || to >= tables.length) return;
+    clearMergeUndoStack();
     const next = [...tables];
     [next[from], next[to]] = [next[to], next[from]];
     resetTables(next, to);
@@ -158,20 +169,36 @@ export default function ExtractionTableEditor({
 
   const confirmMerge = useCallback(() => {
     if (!mergingKey || !mergeTargetKey || mergingKey === mergeTargetKey) return;
-    const a = tables.find(x => x.localKey === mergingKey);
-    const b = tables.find(x => x.localKey === mergeTargetKey);
-    if (!a || !b) return;
-    const primary = a.table_index <= b.table_index ? a : b;
-    const secondary = a.table_index <= b.table_index ? b : a;
-    const merged = mergeTwoTables(primary, secondary);
+    const dest = tables.find(x => x.localKey === mergingKey);
+    const src = tables.find(x => x.localKey === mergeTargetKey);
+    if (!dest || !src) return;
+    mergeUndoStackRef.current.push(
+      tables.map(t => ({
+        ...t,
+        headers: [...t.headers],
+        rows: t.rows.map(r => [...r]),
+      }))
+    );
+    bumpMergeUndoUi();
+    const merged = mergeTwoTables(dest, src);
     const next2 = tables
-      .filter(x => x.localKey !== secondary.localKey)
-      .map(x => (x.localKey === primary.localKey ? { ...merged, localKey: primary.localKey } : x));
-    const pi = next2.findIndex(x => x.localKey === primary.localKey);
+      .filter(x => x.localKey !== src.localKey)
+      .map(x => (x.localKey === dest.localKey ? { ...merged, localKey: dest.localKey } : x));
+    const pi = next2.findIndex(x => x.localKey === dest.localKey);
     setMergingKey(null);
     setMergeTargetKey(null);
     resetTables(next2, Math.max(0, pi));
   }, [mergeTargetKey, mergingKey, resetTables, tables]);
+
+  const undoLastTableMerge = useCallback(() => {
+    const snap = mergeUndoStackRef.current.pop();
+    bumpMergeUndoUi();
+    if (!snap) return;
+    onChange(reindexExtractionTables(snap));
+    setMergingKey(null);
+    setMergeTargetKey(null);
+    setActiveIdx(i => Math.max(0, Math.min(i, snap.length - 1)));
+  }, [onChange]);
 
   const mergePanel = useMemo(() => {
     if (!enableMerge || !mergingKey) return null;
@@ -240,6 +267,8 @@ export default function ExtractionTableEditor({
       </div>
     );
   }, [confirmMerge, enableMerge, mergeTargetKey, mergingKey, tables]);
+
+  const canUndoMerge = mergeUndoStackRef.current.length > 0;
 
   return (
     <div className="flex flex-col min-h-0 flex-1">
@@ -332,6 +361,16 @@ export default function ExtractionTableEditor({
         >
           <Plus className="w-3.5 h-3.5" /> Add table
         </button>
+        {enableMerge && canUndoMerge && (
+          <button
+            type="button"
+            onClick={undoLastTableMerge}
+            className="ml-1 px-2 py-1 text-sm text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-950/40 flex items-center gap-1 shrink-0"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+            Undo merge
+          </button>
+        )}
       </div>
 
       {mergePanel}
