@@ -1,4 +1,5 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
@@ -51,24 +52,26 @@ engine = create_async_engine(
             "idle_in_transaction_session_timeout": "600000",  # 10 minutes
         }
     },
-    # SQLAlchemy pool settings for long-running operations
+    # pool_pre_ping: verify connection is alive before checkout — avoids stale asyncpg
+    # sockets after long LLM calls (e.g. 15+ min Mistral) that exceed server idle limits.
     pool_pre_ping=True,
-    pool_recycle=1800,  # Recycle connections every 30 minutes (more frequent)
+    # pool_recycle: drop connections older than 10 min so pool does not hand out dead links
+    # when extraction + commit runs long after the connection was opened.
+    pool_recycle=600,
     pool_timeout=60,    # Wait up to 60 seconds for a connection
     max_overflow=20,    # Allow up to 20 extra connections
     pool_size=10,       # Maintain 10 connections in the pool
     echo=False,         # Set to True for debugging SQL queries
 )
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+# async_sessionmaker: each ``async with AsyncSessionLocal() as db`` yields an AsyncSession
+# that is a proper async context manager (required for runner.run_tool / short-lived writes).
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
 # Synchronous version for initialization scripts
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 # Create synchronous engine for initialization
 sync_database_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 sync_engine = create_engine(sync_database_url)

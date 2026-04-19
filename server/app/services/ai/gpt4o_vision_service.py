@@ -14,6 +14,7 @@ so that GPT-5 is scientifically comparable to Textract, Docling, etc.
 """
 
 import os
+import re
 import json
 import base64
 import logging
@@ -293,7 +294,7 @@ Return only the JSON object matching the required schema."""
             instructions=SYSTEM_PROMPT,
             reasoning={"effort": reasoning_effort},
             text=text_cfg,
-            max_output_tokens=32000,
+            max_output_tokens=100000,
         )
 
         # Record real token usage for the cost calculator
@@ -445,6 +446,30 @@ Return only the JSON object matching the required schema."""
             logger.error("PDF text extraction failed: %s", exc)
             return ""
 
+    def _chunk_text(self, text: str, max_chars: int = 60_000) -> List[str]:
+        """Split on page boundaries (\n--- PAGE ), never mid-page."""
+        parts = text.split("\n--- PAGE ")
+        segments: List[str] = []
+        for i, part in enumerate(parts):
+            if i == 0 and not part.strip():
+                continue
+            seg = ("\n--- PAGE " + part) if i > 0 else part
+            segments.append(seg)
+        if not segments:
+            return [text]
+        chunks: List[str] = []
+        current = ""
+        for seg in segments:
+            candidate = current + seg if current else seg
+            if len(candidate) > max_chars and current:
+                chunks.append(current)
+                current = seg
+            else:
+                current = candidate
+        if current:
+            chunks.append(current)
+        return chunks if chunks else [text]
+
     def extract_from_digital_pdf_intelligent(self, pdf_path: str) -> Dict[str, Any]:
         """
         Extract tables from a digital (text-based) PDF using the Responses API.
@@ -461,22 +486,86 @@ Return only the JSON object matching the required schema."""
                 return {"success": False, "error": "PDF contains no extractable text"}
 
             logger.info("Digital PDF call: %d chars of text", len(doc_content))
-            prompt_text = USER_PROMPT + "\n\n--- DOCUMENT TEXT ---\n\n" + doc_content[:100_000]
 
-            if ENABLE_RESPONSES_API:
-                raw = self._responses_call(
-                    [{"type": "input_text", "text": prompt_text}],
-                    reasoning_effort="medium",   # text is already readable
-                    verbosity="high",            # faithful transcription, not summary
+            if len(doc_content) <= 60_000:
+                prompt_text = USER_PROMPT + "\n\n--- DOCUMENT TEXT ---\n\n" + doc_content
+                if ENABLE_RESPONSES_API:
+                    raw = self._responses_call(
+                        [{"type": "input_text", "text": prompt_text}],
+                        reasoning_effort="medium",
+                        verbosity="high",
+                    )
+                else:
+                    messages = [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt_text},
+                    ]
+                    raw = self._chat_completions_fallback(messages)
+                return self._parse_extraction_response(raw, "digital_pdf")
+
+            chunks = self._chunk_text(doc_content)
+            if len(chunks) == 1:
+                prompt_text = (
+                    USER_PROMPT + "\n\n--- DOCUMENT TEXT ---\n\n" + chunks[0]
                 )
-            else:
-                messages = [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt_text},
-                ]
-                raw = self._chat_completions_fallback(messages)
+                if ENABLE_RESPONSES_API:
+                    raw = self._responses_call(
+                        [{"type": "input_text", "text": prompt_text}],
+                        reasoning_effort="medium",
+                        verbosity="high",
+                    )
+                else:
+                    messages = [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt_text},
+                    ]
+                    raw = self._chat_completions_fallback(messages)
+                return self._parse_extraction_response(raw, "digital_pdf")
 
-            return self._parse_extraction_response(raw, "digital_pdf")
+            all_tables: List[Dict[str, Any]] = []
+            doc_meta_first: Optional[Dict[str, Any]] = None
+            for i, chunk in enumerate(chunks):
+                prompt_text = (
+                    USER_PROMPT
+                    + f"\n\n--- DOCUMENT TEXT (part {i + 1}/{len(chunks)}) ---\n\n"
+                    + chunk
+                )
+                if ENABLE_RESPONSES_API:
+                    raw = self._responses_call(
+                        [{"type": "input_text", "text": prompt_text}],
+                        reasoning_effort="medium",
+                        verbosity="high",
+                    )
+                else:
+                    messages = [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt_text},
+                    ]
+                    raw = self._chat_completions_fallback(messages)
+                chunk_result = self._parse_extraction_response(
+                    raw, f"digital_pdf_chunk_{i + 1}"
+                )
+                if chunk_result.get("success"):
+                    all_tables.extend(chunk_result.get("tables", []))
+                    if doc_meta_first is None and chunk_result.get("document_metadata"):
+                        doc_meta_first = chunk_result["document_metadata"]
+            if not all_tables:
+                return {
+                    "success": False,
+                    "error": "All chunks returned empty tables",
+                }
+            out: Dict[str, Any] = {
+                "success": True,
+                "tables": all_tables,
+                "extraction_metadata": {
+                    "method": "digital_pdf_chunked",
+                    "timestamp": datetime.now().isoformat(),
+                    "chunks_processed": len(chunks),
+                },
+            }
+            if doc_meta_first:
+                out["document_metadata"] = doc_meta_first
+            return out
 
         except Exception as exc:
             logger.error("Digital PDF extraction failed: %s", exc)
@@ -484,6 +573,61 @@ Return only the JSON object matching the required schema."""
 
     # Keep legacy name as alias so any direct callers are unaffected
     extract_from_digital_pdf = extract_from_digital_pdf_intelligent
+
+    def _is_truncated_json(self, text: str) -> bool:
+        """Heuristic: valid JSON must end with } or ] after stripping whitespace."""
+        stripped = text.rstrip()
+        return bool(stripped) and stripped[-1] not in ("}", "]")
+
+    def _recover_truncated_tables_json(self, text: str) -> Optional[Dict[str, Any]]:
+        """
+        Recover complete table objects from a truncated response using JSONDecoder.raw_decode.
+        """
+        m = re.search(r'"tables"\s*:\s*\[', text)
+        if not m:
+            return None
+        bracket_idx = text.find("[", m.start())
+        if bracket_idx < 0:
+            return None
+        decoder = json.JSONDecoder()
+        idx = bracket_idx + 1
+        n = len(text)
+        tables_out: List[Any] = []
+        while idx < n:
+            while idx < n and text[idx] in " \t\n\r":
+                idx += 1
+            if idx >= n:
+                break
+            if text[idx] == "]":
+                break
+            try:
+                obj, end = decoder.raw_decode(text, idx)
+                tables_out.append(obj)
+                idx = end
+                while idx < n and text[idx] in " \t\n\r":
+                    idx += 1
+                if idx < n and text[idx] == ",":
+                    idx += 1
+                    continue
+                if idx < n and text[idx] == "]":
+                    break
+            except json.JSONDecodeError:
+                break
+        if not tables_out:
+            return None
+        logger.warning(
+            "Recovered %d complete table(s) from truncated JSON response",
+            len(tables_out),
+        )
+        return {
+            "tables": tables_out,
+            "document_metadata": {
+                "carrier_name": None,
+                "statement_date": None,
+                "broker_company": None,
+            },
+            "extraction_notes": "recovered_after_truncation",
+        }
 
     # ── Response parsing ──────────────────────────────────────────────────────
 
@@ -513,7 +657,23 @@ Return only the JSON object matching the required schema."""
                 text = text[:-3]
             text = text.strip()
 
-            parsed_json = json.loads(text)
+            try:
+                parsed_json = json.loads(text)
+            except json.JSONDecodeError as exc:
+                if self._is_truncated_json(text):
+                    logger.warning(
+                        "Response JSON appears truncated — output ceiling hit"
+                    )
+                parsed_json = self._recover_truncated_tables_json(text)
+                if parsed_json is None:
+                    logger.error(
+                        "JSON decode failed (%s): %s — preview: %.200s",
+                        method,
+                        exc,
+                        content,
+                    )
+                    return {"success": False, "error": f"JSON decode failed: {exc}"}
+
             tables_raw = parsed_json.get("tables", [])
 
             if not tables_raw:
@@ -563,9 +723,6 @@ Return only the JSON object matching the required schema."""
 
             return out
 
-        except json.JSONDecodeError as exc:
-            logger.error("JSON decode failed (%s): %s — preview: %.200s", method, exc, content)
-            return {"success": False, "error": f"JSON decode failed: {exc}"}
         except Exception as exc:
             logger.error("Response parsing failed (%s): %s", method, exc)
             return {"success": False, "error": f"Parsing failed: {exc}"}

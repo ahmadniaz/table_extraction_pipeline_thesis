@@ -6,6 +6,7 @@ Pixtral Large model for commission statement processing.
 """
 
 import os
+import json
 import base64
 import logging
 import time
@@ -62,10 +63,7 @@ from .models import (
     DocumentIntelligence,
     TableIntelligence,
     TableData,
-    IntelligentExtractionResponse,
     EnhancedCommissionDocument,
-    EnhancedDocumentMetadata,
-    EnhancedCommissionTable,
     SharedBenchmarkDocument,
 )
 from .prompts import MistralPrompts
@@ -436,6 +434,38 @@ Focus on achieving 99%+ extraction completeness with superior vision processing.
                 "content": ""
             }
 
+    def _chunk_ocr_markdown(self, text: str, max_chars: int = 20_000) -> List[str]:
+        """
+        Split combined OCR markdown on PAGE BREAK boundaries so each chat.parse
+        request stays smaller — one monolithic structured call for 15+ pages
+        routinely sits in Mistral's queue / generation for many minutes with no
+        local log progress (blocking HTTP).
+        """
+        delim = "\n\n--- PAGE BREAK ---\n\n"
+        if delim not in text:
+            return [text] if text.strip() else []
+        parts = text.split(delim)
+        segments: List[str] = []
+        for i, part in enumerate(parts):
+            if i == 0 and not part.strip():
+                continue
+            seg = (delim + part) if i > 0 else part
+            segments.append(seg)
+        if not segments:
+            return [text] if text.strip() else []
+        chunks: List[str] = []
+        current = ""
+        for seg in segments:
+            candidate = current + seg if current else seg
+            if len(candidate) > max_chars and current:
+                chunks.append(current)
+                current = seg
+            else:
+                current = candidate
+        if current:
+            chunks.append(current)
+        return chunks if chunks else [text]
+
     def _call_mistral_chat_for_tables(
         self,
         ocr_markdown: str,
@@ -459,88 +489,228 @@ Focus on achieving 99%+ extraction completeness with superior vision processing.
             system_prompt = MistralPrompts.get_system_prompt()
             user_prompt = MistralPrompts.get_table_extraction_prompt()
 
-            full_user_content = (
-                user_prompt
-                + "\n\n--- OCR MARKDOWN START ---\n"
-                + ocr_markdown[:100_000]
-                + "\n--- OCR MARKDOWN END ---\n"
-            )
+            ocr_body = ocr_markdown[:100_000]
+            chunks = [ocr_body]
+            # Split earlier so each Pixtral chunk is smaller — reduces hitting max_tokens mid-JSON
+            if page_count > 10 or len(ocr_body) > 16_000:
+                split_chunks = self._chunk_ocr_markdown(ocr_body)
+                if len(split_chunks) > 1:
+                    chunks = split_chunks
+                    logger.info(
+                        "Mistral structured extraction split into %d OCR chunks "
+                        "(pages=%s, markdown_chars=%s)",
+                        len(chunks),
+                        page_count,
+                        len(ocr_body),
+                    )
 
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": full_user_content},
-            ]
+            all_normalised: List[Dict[str, Any]] = []
+            doc_meta_merged: Dict[str, Any] = {}
+            usage_in: Optional[int] = None
+            usage_out: Optional[int] = None
 
-            logger.info(
-                "Mistral chat.parse structured extraction model=%s (OCR pages=%s)",
-                self.chat_model,
-                page_count,
-            )
+            for idx, chunk in enumerate(chunks):
+                if len(chunks) > 1:
+                    full_user_content = (
+                        user_prompt
+                        + f"\n\n--- OCR MARKDOWN (part {idx + 1}/{len(chunks)}) START ---\n"
+                        + chunk
+                        + "\n--- OCR MARKDOWN END ---\n"
+                    )
+                else:
+                    full_user_content = (
+                        user_prompt
+                        + "\n\n--- OCR MARKDOWN START ---\n"
+                        + chunk
+                        + "\n--- OCR MARKDOWN END ---\n"
+                    )
 
-            response = self.client.chat.parse(
-                model=self.chat_model,
-                messages=messages,
-                response_format=SharedBenchmarkDocument,
-                max_tokens=16000,
-                temperature=0.0,
-            )
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": full_user_content},
+                ]
 
-            if not hasattr(response, "choices") or not response.choices:
-                return {"success": False, "error": "No choices in Mistral chat response"}
-
-            parsed = response.choices[0].message.parsed
-            if not parsed:
-                return {"success": False, "error": "Parsed response is empty"}
-
-            parsed_dict = parsed.model_dump()
-            tables = parsed_dict.get("tables", []) or []
-            doc_meta = dict(parsed_dict.get("document_metadata") or {})
-            notes = parsed_dict.get("extraction_notes")
-            if notes:
-                doc_meta["extraction_notes"] = notes
-
-            normalised_tables: List[Dict[str, Any]] = []
-            for t in tables:
-                headers = t.get("headers", []) or []
-                rows = t.get("rows", []) or []
-                if not headers and not rows:
-                    continue
-
-                n = len(headers)
-                fixed_rows: List[List[str]] = []
-                for row in rows:
-                    row_list = list(row or [])
-                    if n:
-                        row_list = (row_list + [""] * n)[:n]
-                    fixed_rows.append(row_list)
-
-                if not fixed_rows and not headers:
-                    continue
-
-                normalised_tables.append(
-                    {
-                        "headers": headers,
-                        "rows": fixed_rows,
-                        "page_number": t.get("page_number"),
-                        "table_type": t.get("table_type") or "commission_table",
-                        "extractor": "mistral_chat_structured",
-                        "confidence_score": t.get("confidence_score", 0.9),
-                    }
+                logger.info(
+                    "Mistral chat.parse model=%s pages=%s chunk=%s/%s (chars=%s) — "
+                    "blocking until API returns (large structured calls often take several minutes)",
+                    self.chat_model,
+                    page_count,
+                    idx + 1,
+                    len(chunks),
+                    len(chunk),
                 )
 
+                chunk_processed = False
+                for attempt in range(2):
+                    t0 = time.perf_counter()
+                    try:
+                        response = self.client.chat.parse(
+                            model=self.chat_model,
+                            messages=messages,
+                            response_format=SharedBenchmarkDocument,
+                            max_tokens=16000,  # lower ceiling per chunk so dense tables finish inside budget
+                            temperature=0.0,
+                        )
+                    except json.JSONDecodeError as jde:
+                        if attempt == 0:
+                            logger.warning(
+                                "Mistral chat.parse JSONDecodeError — retrying once "
+                                "(chunk %s/%s): %s",
+                                idx + 1,
+                                len(chunks),
+                                jde,
+                            )
+                            continue
+                        logger.error(
+                            "Mistral chat.parse JSONDecodeError — retry also failed "
+                            "(chunk %s/%s): %s",
+                            idx + 1,
+                            len(chunks),
+                            jde,
+                        )
+                        break
+
+                    elapsed = time.perf_counter() - t0
+                    logger.info(
+                        "Mistral chat.parse chunk %s/%s finished in %.1fs (attempt %s)",
+                        idx + 1,
+                        len(chunks),
+                        elapsed,
+                        attempt + 1,
+                    )
+
+                    if not hasattr(response, "choices") or not response.choices:
+                        logger.error(
+                            "Mistral chat.parse chunk %s/%s: no choices",
+                            idx + 1,
+                            len(chunks),
+                        )
+                        break
+
+                    choice = response.choices[0]
+                    finish_reason = getattr(choice, "finish_reason", None)
+                    finish_reason_str = getattr(finish_reason, "value", finish_reason)
+                    if finish_reason_str == "length":
+                        logger.error(
+                            "Mistral chat.parse output truncated at max_tokens (finish_reason=length): "
+                            "chunk_index=%s chunk_chars=%s model=%s",
+                            idx + 1,
+                            len(chunk),
+                            self.chat_model,
+                        )
+                        break
+
+                    try:
+                        parsed = choice.message.parsed
+                        if not parsed:
+                            logger.error(
+                                "Mistral chat.parse chunk %s/%s: empty parsed object",
+                                idx + 1,
+                                len(chunks),
+                            )
+                            break
+
+                        parsed_dict = parsed.model_dump()
+                        tables = parsed_dict.get("tables", []) or []
+                        doc_meta = dict(parsed_dict.get("document_metadata") or {})
+                        notes = parsed_dict.get("extraction_notes")
+                        if notes:
+                            doc_meta["extraction_notes"] = notes
+                        if doc_meta and not doc_meta_merged:
+                            doc_meta_merged = doc_meta
+
+                        for t in tables:
+                            headers = t.get("headers", []) or []
+                            rows = t.get("rows", []) or []
+                            if not headers and not rows:
+                                continue
+
+                            n = len(headers)
+                            fixed_rows: List[List[str]] = []
+                            for row in rows:
+                                row_list = list(row or [])
+                                if n:
+                                    row_list = (row_list + [""] * n)[:n]
+                                fixed_rows.append(row_list)
+
+                            if not fixed_rows and not headers:
+                                continue
+
+                            all_normalised.append(
+                                {
+                                    "headers": headers,
+                                    "rows": fixed_rows,
+                                    "page_number": t.get("page_number"),
+                                    "table_type": t.get("table_type") or "commission_table",
+                                    "extractor": "mistral_chat_structured",
+                                    "confidence_score": t.get("confidence_score", 0.9),
+                                }
+                            )
+
+                        if hasattr(response, "usage") and response.usage:
+                            pt = getattr(response.usage, "prompt_tokens", None)
+                            ct = getattr(response.usage, "completion_tokens", None)
+                            if isinstance(pt, int):
+                                usage_in = (usage_in or 0) + pt
+                            if isinstance(ct, int):
+                                usage_out = (usage_out or 0) + ct
+                        chunk_processed = True
+                        break
+                    except json.JSONDecodeError as jde:
+                        raw = getattr(choice.message, "content", None) or ""
+                        raw_s = raw if isinstance(raw, str) else str(raw)
+                        if attempt == 0:
+                            logger.warning(
+                                "Mistral structured parse JSONDecodeError — retrying once "
+                                "(chunk %s/%s): %s; raw_len=%s preview=%.200s",
+                                idx + 1,
+                                len(chunks),
+                                jde,
+                                len(raw_s),
+                                raw_s,
+                            )
+                            continue
+                        logger.error(
+                            "Mistral structured parse JSONDecodeError — retry also failed "
+                            "(chunk %s/%s): %s; raw_len=%s preview=%.200s",
+                            idx + 1,
+                            len(chunks),
+                            jde,
+                            len(raw_s),
+                            raw_s,
+                        )
+                        break
+                    except Exception as parse_exc:
+                        logger.error(
+                            "Mistral chat.parse chunk %s/%s response parse failed: %s",
+                            idx + 1,
+                            len(chunks),
+                            parse_exc,
+                            exc_info=True,
+                        )
+                        break
+
+                if not chunk_processed:
+                    continue
+
             usage: Dict[str, Any] = {}
-            if hasattr(response, "usage") and response.usage:
-                pt = getattr(response.usage, "prompt_tokens", None)
-                ct = getattr(response.usage, "completion_tokens", None)
+            if usage_in is not None or usage_out is not None:
                 usage = {
-                    "input_tokens": pt,
-                    "output_tokens": ct,
+                    "input_tokens": usage_in,
+                    "output_tokens": usage_out,
+                }
+
+            if not all_normalised:
+                return {
+                    "success": False,
+                    "error": "No tables from Mistral chat.parse (all chunks empty or failed)",
+                    "usage": usage,
                 }
 
             return {
                 "success": True,
-                "tables": normalised_tables,
-                "document_metadata": doc_meta,
+                "tables": all_normalised,
+                "document_metadata": doc_meta_merged,
                 "usage": usage,
             }
 
@@ -751,7 +921,22 @@ Focus on achieving 99%+ extraction completeness with superior vision processing.
                         chat_result.get("error", "unknown"),
                     )
 
-            final_tables = structured_tables if structured_tables else tables_from_markdown
+            md_count = len(tables_from_markdown)
+            st_count = len(structured_tables)
+            if md_count == 0:
+                final_tables = structured_tables if structured_tables else tables_from_markdown
+            elif st_count == 0:
+                final_tables = tables_from_markdown
+            elif st_count >= 0.9 * md_count:
+                final_tables = structured_tables
+            else:
+                logger.warning(
+                    "Structured extraction incomplete vs OCR baseline "
+                    "(structured=%s markdown=%s); using markdown tables",
+                    st_count,
+                    md_count,
+                )
+                final_tables = tables_from_markdown
 
             if not final_tables:
                 logger.warning("No tables from OCR markdown or structured chat")
@@ -764,11 +949,13 @@ Focus on achieving 99%+ extraction completeness with superior vision processing.
             document_metadata: Dict[str, Any] = {
                 "total_pages": total_pages,
                 "extraction_method": (
-                    "mistral_ocr_2505_structured" if structured_tables else "mistral_ocr_2505"
+                    "mistral_ocr_2505_structured"
+                    if final_tables is structured_tables and structured_tables
+                    else "mistral_ocr_2505"
                 ),
                 "model": self.ocr_model,
             }
-            if structured_tables:
+            if final_tables is structured_tables and structured_tables:
                 document_metadata["chat_model"] = self.chat_model
             document_metadata.update(structured_meta)
 
@@ -1176,7 +1363,7 @@ Return structured JSON with all tables and business context analysis.
                     model=self.intelligent_model,
                     messages=messages,
                     response_format=TableIntelligence,
-                    max_tokens=8000,
+                    max_tokens=32000,
                     temperature=0
                 )
                 
@@ -1204,7 +1391,7 @@ Return structured JSON with all tables and business context analysis.
                     response = self.client.chat.complete(
                         model=self.intelligent_model,
                         messages=messages,
-                        max_tokens=8000,
+                        max_tokens=32000,
                         temperature=0
                     )
                     
@@ -1850,7 +2037,7 @@ to handle both digital and scanned content with equal excellence.
                     model=self.intelligent_model,
                     messages=messages,
                     response_format=EnhancedCommissionDocument,
-                    max_tokens=8000, 
+                    max_tokens=32000,
                     temperature=0
                 )
                 
@@ -2030,7 +2217,7 @@ to handle both digital and scanned content with equal excellence.
             response = self.client.chat.complete(
                 model=self.intelligent_model,
                 messages=messages,
-                max_tokens=4000,
+                max_tokens=16000,
                 temperature=0
             )
             

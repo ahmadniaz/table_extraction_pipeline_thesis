@@ -138,7 +138,9 @@ class ClaudeDocumentAIService:
             logger.info(f"🔑 API Key found: {api_key[:15]}...")
             
             self.client = Anthropic(api_key=api_key)
-            self.async_client = AsyncAnthropic(api_key=api_key)
+            self.async_client = AsyncAnthropic(
+                api_key=api_key, timeout=self.timeout_seconds
+            )
             
             logger.info("✅ Claude API client initialized successfully")
             logger.info(f"📋 Client object: {type(self.client)}")
@@ -473,7 +475,7 @@ class ClaudeDocumentAIService:
                 )
             
             # Split into manageable chunks
-            chunks = self.pdf_processor.chunk_large_pdf(file_path, max_pages_per_chunk=40)
+            chunks = self.pdf_processor.chunk_large_pdf(file_path, max_pages_per_chunk=12)
             
             logger.info(f"Split document into {len(chunks)} chunks")
             
@@ -533,36 +535,58 @@ class ClaudeDocumentAIService:
         self,
         file_path: str,
         chunk_info: Dict[str, Any],
-        progress_tracker = None
+        progress_tracker=None,
     ) -> Dict[str, Any]:
         """Extract data from a specific chunk of the document"""
+        import fitz
+        import tempfile
+        import os as _os
+
+        tmp_path = None
         try:
-            # For now, encode entire PDF (Claude handles page ranges internally)
-            # In production, you might want to extract specific pages to temp file
-            pdf_base64 = self.pdf_processor.encode_pdf_to_base64(file_path)
-            
-            # Create chunk-specific prompt
+            page_start, page_end = chunk_info["page_range"]  # 0-based, exclusive end
+
+            src_doc = fitz.open(file_path)
+            chunk_doc = fitz.open()
+            chunk_doc.insert_pdf(src_doc, from_page=page_start, to_page=page_end - 1)
+            src_doc.close()
+
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                tmp_path = tmp.name
+            chunk_doc.save(tmp_path)
+            chunk_doc.close()
+
+            try:
+                pdf_base64 = self.pdf_processor.encode_pdf_to_base64(tmp_path)
+            finally:
+                _os.unlink(tmp_path)
+                tmp_path = None
+
             chunk_prompt = self.prompts.get_chunk_extraction_prompt(
                 f"{chunk_info['chunk_index'] + 1}/{chunk_info['total_chunks']}"
             )
-            
-            # Call Claude API
+
             extraction_result = await self._call_claude_api(
                 pdf_base64,
                 chunk_prompt,
-                model=self.primary_model
+                model=self.primary_model,
             )
-            
-            # Parse response
+
             parsed_data = self.response_parser.parse_json_response(
-                extraction_result['content']
+                extraction_result["content"]
             )
-            
-            return parsed_data or {'tables': [], 'document_metadata': {}}
-        
-        except Exception as e:
-            logger.error(f"Error extracting chunk: {e}")
-            return {'tables': [], 'document_metadata': {}}
+            return parsed_data or {"tables": [], "document_metadata": {}}
+
+        except Exception as exc:
+            if tmp_path and _os.path.exists(tmp_path):
+                try:
+                    _os.unlink(tmp_path)
+                except Exception:
+                    pass
+            logger.error(
+                "Error extracting chunk %s: %s", chunk_info.get("chunk_index"), exc
+            )
+            return {"tables": [], "document_metadata": {}}
     
     async def _extract_with_fallback(
         self,
@@ -679,7 +703,7 @@ class ClaudeDocumentAIService:
                 # Build base API kwargs
                 api_kwargs: Dict[str, Any] = {
                     "model": model,
-                    "max_tokens": 16000,
+                    "max_tokens": 8192 * 4,  # 32768 — sufficient for dense multi-page table output
                     "system": self.prompts.get_system_prompt(),
                     "messages": messages,
                 }
@@ -704,10 +728,8 @@ class ClaudeDocumentAIService:
                     f"structured_output={use_structured_output})"
                 )
 
-                response = await asyncio.wait_for(
-                    self.async_client.messages.create(**api_kwargs),
-                    timeout=self.timeout_seconds
-                )
+                async with self.async_client.messages.stream(**api_kwargs) as stream:
+                    response = await stream.get_final_message()
 
                 # Extract content — prefer tool_use block for structured calls
                 content_text = ""

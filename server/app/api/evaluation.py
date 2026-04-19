@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, and_, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
+from app.db.database import get_db, AsyncSessionLocal
 from app.db.models import Document, GroundTruthTable, ExtractionResult, EvaluationScore
 from app.services.evaluation.runner import EvaluationRunner
 from app.services.evaluation.metrics import compute_cell_f1, compute_teds, compute_grits
@@ -160,8 +160,10 @@ async def extract_single_tool(
         await db.commit()
 
     runner = EvaluationRunner()
-    rows = await runner.run_tool(tool_name, doc.file_path, doc.id, db)
-    await _mark_extractions_draft(db, doc_id, tool_name)
+    rows = await runner.run_tool(tool_name, doc.file_path, doc.id, AsyncSessionLocal)
+    # Fresh session: request-scoped ``db`` may have held an idle connection during extraction.
+    async with AsyncSessionLocal() as db_draft:
+        await _mark_extractions_draft(db_draft, doc_id, tool_name)
     out = _summarise_extraction_rows(rows)
     out["already_exists"] = False
     out["extraction_executed"] = True
@@ -334,9 +336,10 @@ async def evaluate_document(
     tools = _resolve_tools(body.tools)
     runner = EvaluationRunner()
     all_results = []
+    scores_to_persist: List[EvaluationScore] = []
 
     for tool_name in tools:
-        extraction_results = await runner.run_tool(tool_name, doc.file_path, doc.id, db)
+        extraction_results = await runner.run_tool(tool_name, doc.file_path, doc.id, AsyncSessionLocal)
         for er in extraction_results:
             gt_match = next((g for g in ground_truths if g.table_index == er.table_index), None)
             if gt_match and not er.error_message:
@@ -357,7 +360,7 @@ async def evaluate_document(
                     grits_con=grits["con"],
                     grits_loc=grits["loc"],
                 )
-                db.add(score)
+                scores_to_persist.append(score)
 
             all_results.append({
                 "tool": tool_name,
@@ -368,7 +371,11 @@ async def evaluate_document(
                 "has_ground_truth": gt_match is not None,
             })
 
-    await db.commit()
+    if scores_to_persist:
+        async with AsyncSessionLocal() as db_write:
+            async with db_write.begin():
+                for sc in scores_to_persist:
+                    db_write.add(sc)
     return {"document_id": str(doc_id), "results": all_results}
 
 
@@ -412,8 +419,9 @@ async def evaluate_batch(
             continue
 
         doc_results = []
+        scores_to_persist: List[EvaluationScore] = []
         for tool_name in tools:
-            extraction_results = await runner.run_tool(tool_name, doc.file_path, doc.id, db)
+            extraction_results = await runner.run_tool(tool_name, doc.file_path, doc.id, AsyncSessionLocal)
             for er in extraction_results:
                 gt_match = next((g for g in ground_truths if g.table_index == er.table_index), None)
                 if gt_match and not er.error_message:
@@ -434,10 +442,14 @@ async def evaluate_batch(
                         grits_con=grits["con"],
                         grits_loc=grits["loc"],
                     )
-                    db.add(score)
+                    scores_to_persist.append(score)
                 doc_results.append(tool_name)
 
-        await db.commit()
+        if scores_to_persist:
+            async with AsyncSessionLocal() as db_write:
+                async with db_write.begin():
+                    for sc in scores_to_persist:
+                        db_write.add(sc)
         summary.append({
             "document_id": str(doc.id),
             "filename": doc.filename,

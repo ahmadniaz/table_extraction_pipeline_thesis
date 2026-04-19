@@ -56,7 +56,7 @@ class ClaudePDFProcessor:
                 'file_size_bytes': file_size_bytes,
                 'file_size_mb': file_size_mb,
                 'page_count': page_count,
-                'is_large_file': file_size_mb > 20 or page_count > 50
+                'is_large_file': file_size_mb > 10 or page_count > 15
             }
         except Exception as e:
             logger.error(f"Error getting PDF info: {e}")

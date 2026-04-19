@@ -74,7 +74,15 @@ Accuracy and structural fidelity are more important than natural language."""
 
 # ── User prompt ───────────────────────────────────────────────────────────────
 
-USER_PROMPT: str = """You are given an insurance commission statement as a PDF (and/or page images).
+USER_PROMPT: str = """CRITICAL EXTRACTION RULES — READ BEFORE PROCESSING:
+
+1. COMPLETENESS: You MUST extract ALL tables from ALL pages of this document.
+Do NOT stop after the first page or first few tables. Scan every single page
+from page 1 to the last page. Only return your response after reviewing
+every page. Missing tables from any page is a critical failure.
+
+
+You are given an insurance commission statement as a PDF (and/or page images).
 
 Your task is to extract:
 1) All visible tables that contain financial or commission data.

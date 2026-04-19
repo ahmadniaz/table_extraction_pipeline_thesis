@@ -141,7 +141,15 @@ Return a brief summary in JSON format:
     @staticmethod
     def get_chunk_extraction_prompt(chunk_info: str) -> str:
         """Prompt for extracting data from document chunks"""
-        return f"""You are processing chunk {chunk_info} of a large commission statement.
+        return f"""CRITICAL EXTRACTION RULES — READ BEFORE PROCESSING:
+
+1. COMPLETENESS: You MUST extract ALL tables from ALL pages of this document.
+Do NOT stop after the first page or first few tables. Scan every single page
+from page 1 to the last page. Only return your response after reviewing
+every page. Missing tables from any page is a critical failure.
+
+
+You are processing chunk {chunk_info} of a large commission statement.
 
 Extract all tables from this section following the standard extraction rules.
 

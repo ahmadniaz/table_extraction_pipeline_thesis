@@ -1,14 +1,14 @@
 """
-Mistral Document AI Service Package
+Mistral Document AI package.
 
-This package provides intelligent document extraction capabilities using Mistral's
-Pixtral Large model for commission statement processing.
+Pipeline usage (entry points):
+- Evaluation runner (`mistral` tool): `MistralDocumentAIService.extract_commission_data_via_ocr`
+  → OCR markdown + optional `chat.parse` structured extraction (`SharedBenchmarkDocument`).
+- App upload / new_extract: `extract_commission_data_intelligently` (and legacy fallbacks)
+  → document + table intelligence, enhanced extraction, summary/bracket post-processing.
 
-Main Components:
-- models: Pydantic models for structured data
-- service: Core extraction service
-- utils: Utility functions for PDF processing and validation
-- prompts: System prompts for different extraction phases
+Supporting modules (all imported from `service.py`, not dead files):
+`models`, `prompts`, `utils`, `enhanced_summary_detector`, `bracket_processor`, `enhancement_config`.
 """
 
 from .service import MistralDocumentAIService
@@ -18,15 +18,15 @@ from .models import (
     IntelligentExtractionResponse,
     EnhancedCommissionDocument,
     EnhancedDocumentMetadata,
-    EnhancedCommissionTable
+    EnhancedCommissionTable,
 )
 
 __all__ = [
-    'MistralDocumentAIService',
-    'DocumentIntelligence',
-    'TableIntelligence', 
-    'IntelligentExtractionResponse',
-    'EnhancedCommissionDocument',
-    'EnhancedDocumentMetadata',
-    'EnhancedCommissionTable'
+    "MistralDocumentAIService",
+    "DocumentIntelligence",
+    "TableIntelligence",
+    "IntelligentExtractionResponse",
+    "EnhancedCommissionDocument",
+    "EnhancedDocumentMetadata",
+    "EnhancedCommissionTable",
 ]

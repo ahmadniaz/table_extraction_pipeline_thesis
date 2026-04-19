@@ -12,7 +12,6 @@ import uuid
 from typing import List, Dict, Any, Optional, Tuple
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ExtractionResult, Document
 from .cost_calculator import calculate_cost
@@ -292,19 +291,21 @@ class EvaluationRunner:
     # Public API
     # ------------------------------------------------------------------
 
-    async def _persist_and_commit(self, db: AsyncSession, er: ExtractionResult) -> None:
-        db.add(er)
-        await db.flush()
-        await db.commit()
-
     async def run_tool(
         self,
         tool_name: str,
         file_path: str,
         document_id: uuid.UUID,
-        db: AsyncSession,
+        db_factory: Any,
     ) -> List[ExtractionResult]:
-        """Run a single tool and persist ExtractionResult rows (commit after each row)."""
+        """
+        Run a single tool and persist ExtractionResult rows.
+
+        ``db_factory`` must be the async sessionmaker (e.g. ``AsyncSessionLocal``).
+        No DB connection is held open across LLM extraction — only short sessions
+        for loading Document metadata and for the final insert — so idle TCP drops
+        during 10–15 minute tools cannot poison the persist transaction.
+        """
         method_name = self._DISPATCH.get(tool_name)
         if not method_name:
             er = ExtractionResult(
@@ -319,13 +320,17 @@ class EvaluationRunner:
                 raw_output=None,
                 is_draft=False,
             )
-            await self._persist_and_commit(db, er)
+            async with db_factory() as db:
+                async with db.begin():
+                    db.add(er)
             return [er]
 
-        doc_result = await db.execute(select(Document).where(Document.id == document_id))
-        doc = doc_result.scalar_one_or_none()
-        page_count = doc.page_count or 1 if doc else 1
-        is_digital = bool(doc.is_digital) if doc and doc.is_digital is not None else True
+        # Short session: read Document only; close before any slow extraction.
+        async with db_factory() as db:
+            doc_result = await db.execute(select(Document).where(Document.id == document_id))
+            doc = doc_result.scalar_one_or_none()
+            page_count = doc.page_count or 1 if doc else 1
+            is_digital = bool(doc.is_digital) if doc and doc.is_digital is not None else True
 
         start = time.perf_counter()
         error_msg: Optional[str] = None
@@ -389,8 +394,10 @@ class EvaluationRunner:
                 raw_output=raw_safe,
                 is_draft=False,
             )
-            await self._persist_and_commit(db, er)
             results.append(er)
+            async with db_factory() as db:
+                async with db.begin():
+                    db.add(er)
             return results
 
         if _empty_extracted_rows(tables):
@@ -414,8 +421,10 @@ class EvaluationRunner:
                 raw_output=raw_safe,
                 is_draft=False,
             )
-            await self._persist_and_commit(db, er)
             results.append(er)
+            async with db_factory() as db:
+                async with db.begin():
+                    db.add(er)
             return results
 
         for idx, tbl in enumerate(tables):
@@ -433,8 +442,12 @@ class EvaluationRunner:
                 raw_output=raw_safe if idx == 0 else None,
                 is_draft=False,
             )
-            await self._persist_and_commit(db, er)
             results.append(er)
+
+        async with db_factory() as db:
+            async with db.begin():
+                for er in results:
+                    db.add(er)
 
         return results
 
@@ -442,11 +455,11 @@ class EvaluationRunner:
         self,
         document_id: uuid.UUID,
         file_path: str,
-        db: AsyncSession,
+        db_factory: Any,
     ) -> List[ExtractionResult]:
         """Run every registered tool sequentially and return all results."""
         all_results: List[ExtractionResult] = []
         for tool_name in self._DISPATCH:
-            results = await self.run_tool(tool_name, file_path, document_id, db)
+            results = await self.run_tool(tool_name, file_path, document_id, db_factory)
             all_results.extend(results)
         return all_results

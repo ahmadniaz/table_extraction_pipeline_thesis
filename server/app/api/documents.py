@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy import select, delete as sa_delete, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
+from app.db.database import get_db, AsyncSessionLocal
 from app.db.models import Document, GroundTruthTable, ExtractionResult, EvaluationScore
 from app.services.evaluation.runner import EvaluationRunner
 
@@ -141,7 +141,7 @@ async def _apply_default_tool_extraction_and_gt(db: AsyncSession, doc: Document)
 
     runner = EvaluationRunner()
     try:
-        results = await runner.run_tool(tool, doc.file_path, doc.id, db)
+        results = await runner.run_tool(tool, doc.file_path, doc.id, AsyncSessionLocal)
     except Exception as e:
         logger.exception("Default tool extraction failed for document %s", doc.id)
         return {
@@ -151,19 +151,21 @@ async def _apply_default_tool_extraction_and_gt(db: AsyncSession, doc: Document)
             "error": str(e),
         }
 
-    n = await _insert_gt_from_extraction_results(db, doc.id, tool, results)
-    if tool == "claude_sonnet" and results:
-        await db.execute(
-            update(ExtractionResult)
-            .where(
-                and_(
-                    ExtractionResult.document_id == doc.id,
-                    ExtractionResult.tool_name == tool,
+    # Fresh session: caller's ``db`` may have been idle for a long extraction (e.g. Mistral).
+    async with AsyncSessionLocal() as db_after:
+        n = await _insert_gt_from_extraction_results(db_after, doc.id, tool, results)
+        if tool == "claude_sonnet" and results:
+            await db_after.execute(
+                update(ExtractionResult)
+                .where(
+                    and_(
+                        ExtractionResult.document_id == doc.id,
+                        ExtractionResult.tool_name == tool,
+                    )
                 )
+                .values(is_draft=True)
             )
-            .values(is_draft=True)
-        )
-        await db.commit()
+            await db_after.commit()
     out: Dict[str, Any] = {
         "seed_tool": tool,
         "tables_seeded": n,
