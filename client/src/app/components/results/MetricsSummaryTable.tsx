@@ -13,6 +13,7 @@ export interface ToolSummary {
   avg_grits_top: number | null;
   avg_grits_con: number | null;
   cost_per_page: number | null;
+  total_cost_usd: number | null;
   avg_time_ms: number | null;
 }
 
@@ -31,8 +32,9 @@ const COLUMNS: { key: SortKey; label: string; digits?: number }[] = [
   { key: 'avg_teds',      label: 'TEDS' },
   { key: 'avg_grits_top', label: 'GriTS-Top' },
   { key: 'avg_grits_con', label: 'GriTS-Con' },
-  { key: 'cost_per_page', label: 'Cost/Page', digits: 5 },
-  { key: 'avg_time_ms',   label: 'Avg ms',    digits: 0 },
+  { key: 'cost_per_page',   label: 'Cost/Page',   digits: 5 },
+  { key: 'total_cost_usd',  label: 'Total cost',  digits: 4 },
+  { key: 'avg_time_ms',     label: 'Avg ms',      digits: 0 },
 ];
 
 interface Props { data: ToolSummary[]; }
@@ -87,11 +89,12 @@ export default function MetricsSummaryTable({ data }: Props) {
               <td className="px-4 py-3 text-slate-600 dark:text-slate-400 tabular-nums">{fmt(row.avg_grits_top)}</td>
               <td className="px-4 py-3 text-slate-600 dark:text-slate-400 tabular-nums">{fmt(row.avg_grits_con)}</td>
               <td className="px-4 py-3 text-slate-600 dark:text-slate-400 tabular-nums">{fmt(row.cost_per_page, 5)}</td>
+              <td className="px-4 py-3 text-slate-600 dark:text-slate-400 tabular-nums">{fmt(row.total_cost_usd, 4)}</td>
               <td className="px-4 py-3 text-slate-600 dark:text-slate-400 tabular-nums">{fmt(row.avg_time_ms, 0)}</td>
             </tr>
           ))}
           {sorted.length === 0 && (
-            <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-400 text-sm">No results yet. Run an evaluation first.</td></tr>
+            <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-400 text-sm">No results yet. Run an evaluation first.</td></tr>
           )}
         </tbody>
       </table>

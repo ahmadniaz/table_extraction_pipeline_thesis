@@ -53,6 +53,11 @@ function avg(vals: (number | null)[]): number | null {
   return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
 }
 
+function sum(vals: (number | null)[]): number | null {
+  const nums = vals.filter((v): v is number => v != null);
+  return nums.length ? nums.reduce((a, b) => a + b, 0) : null;
+}
+
 function rowsExcludingTransient(rows: RawRow[]): RawRow[] {
   return rows.filter(r => !r.is_transient_failure);
 }
@@ -72,6 +77,7 @@ function buildToolSummaries(rows: RawRow[]): ToolSummary[] {
     avg_grits_top: avg(rs.map(r => r.grits_top)),
     avg_grits_con: avg(rs.map(r => r.grits_con)),
     cost_per_page: avg(rs.map(r => r.cost_usd)),
+    total_cost_usd: sum(rs.map(r => r.cost_usd)),
     avg_time_ms: avg(rs.map(r => r.processing_time_ms)),
   }));
 }
