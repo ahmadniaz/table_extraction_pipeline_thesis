@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 const NAV_LINKS = [
   { href: '/corpus', label: 'Corpus' },
   { href: '/results', label: 'Results' },
+  { href: '/analytics', label: 'Thesis figures' },
 ];
 
 export default function Navbar() {

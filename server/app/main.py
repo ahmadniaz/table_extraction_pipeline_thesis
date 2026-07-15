@@ -7,7 +7,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import documents, ground_truth, evaluation, eval_websocket
+from app.api import documents, ground_truth, evaluation, eval_websocket, analytics
 from sqlalchemy import text
 
 from app.db.models import Base
@@ -56,6 +56,7 @@ app.include_router(documents.router)
 app.include_router(ground_truth.router)
 app.include_router(evaluation.router)
 app.include_router(eval_websocket.router)
+app.include_router(analytics.router)
 
 if __name__ == "__main__":
     import uvicorn

@@ -16,7 +16,11 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Thesis figures (`/analytics`)
+
+Minimal publication-ready chart page for the thesis Results chapter: [`/analytics`](http://localhost:3000/analytics) (`src/app/analytics/page.tsx`, `src/app/components/thesisFigures/`). Data source and aggregation rules: [`../docs/results_analytics.md`](../docs/results_analytics.md). (The old exploratory dashboard components under `components/analytics/` are no longer used by this route.)
+
+You can start editing the main landing page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
